@@ -67,6 +67,54 @@ const sections = [
     body: "Atlas handles the operational complexity of sharding — provisioning mongos routers, balancing chunks, monitoring hotspots, and scaling shards. You choose your shard key and tier; Atlas does the rest.",
     callout: "Atlas Global Clusters extend zone sharding to a point-and-click UI, pinning data to cloud regions for compliance and latency without manual config.",
     visual: "single-node", values: null
+  },
+  {
+    id: "discovery", label: "Discovery Questions", icon: "🔍",
+    headline: "Discovery Questions",
+    body: null, callout: null, visual: "discovery", values: null
+  }
+];
+
+const discoveryQs = [
+  {
+    icon: "💥",
+    title: "Current Scale & Pain",
+    qs: [
+      "How large is your dataset today, and what's your projected growth rate over the next 12–24 months?",
+      "Are you hitting performance walls — slow queries, high latency, or storage limits — on your current deployment?",
+      "Have you ever had to archive or delete data just to keep your primary cluster manageable?",
+      "What happens to your application when your database server is under peak load?"
+    ]
+  },
+  {
+    icon: "🔧",
+    title: "Architecture & Data Model",
+    qs: [
+      "How is your data currently structured — do you have one large collection that dominates read/write traffic?",
+      "Have you thought about what field you'd use as a shard key? What does your most common query pattern look like?",
+      "Do you have any requirements to keep certain data in specific regions — for compliance, latency, or data residency?",
+      "Are your workloads read-heavy, write-heavy, or mixed? Do you have any time-series or append-only patterns?"
+    ]
+  },
+  {
+    icon: "🏢",
+    title: "Operational Concerns",
+    qs: [
+      "Who manages your database infrastructure today? Do they have experience operating a sharded cluster?",
+      "How much time does your team spend on database capacity planning and scaling operations?",
+      "Have you experienced any outages or degradation caused by hitting the limits of a single-node deployment?",
+      "What does your current backup, monitoring, and alerting setup look like for your database?"
+    ]
+  },
+  {
+    icon: "🚀",
+    title: "Future State & Strategic Direction",
+    qs: [
+      "If you could scale your database infinitely without operational overhead, what new workloads or features would you build?",
+      "Are you considering a move to the cloud, or expanding to multiple regions? How does your database strategy support that?",
+      "What's driving the timeline — is there a product launch, a compliance deadline, or a capacity ceiling you're approaching?",
+      "How important is it that your developers use the same query language and data model at any scale?"
+    ]
   }
 ];
 
@@ -111,6 +159,64 @@ function ValueGrid({values}) {
           <div style={{fontSize:20,marginBottom:8}}>{v.icon}</div>
           <div style={{fontFamily:"Georgia, serif",fontSize:14,fontWeight:700,marginBottom:4}}>{v.title}</div>
           <div style={{color:muted,fontSize:12,lineHeight:1.6,fontStyle:"italic"}}>{v.desc}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DiscoverySection() {
+  const [openIdx, setOpenIdx] = React.useState(0);
+  const [tooltip, setTooltip] = React.useState({ show: false, x: 0, y: 0 });
+
+  React.useEffect(() => {
+    const move = e => setTooltip(t => ({ ...t, x: e.clientX + 12, y: e.clientY - 8 }));
+    window.addEventListener("mousemove", move);
+    return () => window.removeEventListener("mousemove", move);
+  }, []);
+
+  function copyQ(q) {
+    navigator.clipboard.writeText(q);
+    setTooltip(t => ({ ...t, show: true }));
+    setTimeout(() => setTooltip(t => ({ ...t, show: false })), 1500);
+  }
+
+  return (
+    <div>
+      {tooltip.show && (
+        <div style={{position:"fixed",background:green,color:bg,fontSize:11,padding:"6px 14px",borderRadius:3,pointerEvents:"none",fontFamily:"Georgia, serif",fontStyle:"italic",fontWeight:"bold",zIndex:1000,left:tooltip.x,top:tooltip.y}}>Copied!</div>
+      )}
+      <div style={{background:"rgba(0,237,100,0.06)",border:"1px solid rgba(0,237,100,0.25)",borderLeft:`3px solid ${green}`,borderRadius:"0 6px 6px 0",padding:"16px 20px",marginBottom:24}}>
+        <p style={{color:muted,fontSize:13,lineHeight:1.7,fontStyle:"italic"}}>Use these questions to uncover pain, quantify impact, and build urgency. Hover any question and click <strong style={{color:text,fontStyle:"normal"}}>copy</strong> to grab it for your call notes.</p>
+      </div>
+      {discoveryQs.map((sec, i) => (
+        <div key={i} style={{marginBottom:12}}>
+          <div onClick={() => setOpenIdx(openIdx === i ? -1 : i)}
+            style={{display:"flex",alignItems:"center",gap:12,padding:"14px 20px",background:openIdx===i?"rgba(0,237,100,0.04)":card,border:`1px solid ${openIdx===i ? "rgba(0,237,100,0.3)" : cardBorder}`,borderRadius:openIdx===i?"6px 6px 0 0":"6px",cursor:"pointer",transition:"all 0.2s",userSelect:"none"}}>
+            <span style={{fontSize:18}}>{sec.icon}</span>
+            <span style={{fontFamily:"Georgia, serif",fontSize:15,fontWeight:"bold",flex:1}}>{sec.title}</span>
+            <span style={{color:muted,fontSize:11,fontStyle:"italic"}}>{sec.qs.length} questions</span>
+            <span style={{color:muted,fontSize:12}}>{openIdx===i ? "▲" : "▼"}</span>
+          </div>
+          {openIdx === i && (
+            <div style={{border:"1px solid rgba(0,237,100,0.3)",borderTop:"none",borderRadius:"0 0 6px 6px",background:"rgba(0,237,100,0.02)"}}>
+              {sec.qs.map((q, j) => (
+                <div key={j}
+                  style={{display:"flex",gap:12,alignItems:"flex-start",padding:"14px 20px",borderBottom:j<sec.qs.length-1?"1px solid rgba(255,255,255,0.04)":"none"}}
+                  onMouseEnter={e => e.currentTarget.style.background="rgba(0,237,100,0.05)"}
+                  onMouseLeave={e => e.currentTarget.style.background="transparent"}>
+                  <span style={{width:6,height:6,background:green,borderRadius:"50%",flexShrink:0,marginTop:7,display:"inline-block"}}></span>
+                  <span style={{fontSize:13,color:text,lineHeight:1.65,flex:1,fontStyle:"italic"}}>"{q}"</span>
+                  <button onClick={() => copyQ(q)}
+                    style={{flexShrink:0,padding:"4px 10px",background:"transparent",border:`1px solid ${cardBorder}`,color:muted,fontFamily:"Georgia, serif",fontSize:10,cursor:"pointer",borderRadius:3,letterSpacing:"0.05em",fontStyle:"italic"}}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor=green; e.currentTarget.style.color=green; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor=cardBorder; e.currentTarget.style.color=muted; }}>
+                    copy
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       ))}
     </div>
@@ -174,6 +280,7 @@ function App() {
 
           {section.visual === "shards" && <ShardViz />}
           {section.visual === "routing" && <RoutingViz />}
+          {section.visual === "discovery" && <DiscoverySection />}
 
           {section.body && (
             <p style={{color:muted,fontSize:14,lineHeight:1.8,marginBottom:section.callout||section.values?20:0,fontStyle:"italic"}}>{section.body}</p>
