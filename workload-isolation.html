@@ -1,1198 +1,504 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MongoDB Workload Isolation</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MongoDB Workload Isolation Explained</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
 <style>
-  :root {
-    --green: #00ED64;
-    --dark-green: #00684A;
-    --black: #001E2B;
-    --slate: #023430;
-    --mid: #0C3547;
-    --surface: #112733;
-    --border: #1a3a4a;
-    --text: #E8F4F1;
-    --muted: #7B9EA8;
-    --red: #FF6B6B;
-    --amber: #FFB347;
-    --blue: #4DB8FF;
-  }
-
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-
-  body {
-    background: var(--black);
-    color: var(--text);
-    font-family: 'DM Mono', monospace;
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
-
-  /* Grid background */
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image:
-      linear-gradient(rgba(0,237,100,0.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(0,237,100,0.03) 1px, transparent 1px);
-    background-size: 40px 40px;
-    pointer-events: none;
-    z-index: 0;
-  }
-
-  .container {
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 0 24px;
-    position: relative;
-    z-index: 1;
-  }
-
-  /* HEADER */
-  header {
-    padding: 40px 0 20px;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .header-inner {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-  }
-
-  .logo-mark {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-
-  .leaf {
-    width: 32px;
-    height: 32px;
-    background: var(--green);
-    border-radius: 0 50% 0 50%;
-    transform: rotate(-45deg);
-    flex-shrink: 0;
-  }
-
-  .brand {
-    font-family: 'Syne', sans-serif;
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    color: var(--green);
-  }
-
-  .nav-pills {
-    display: flex;
-    gap: 6px;
-  }
-
-  .nav-pill {
-    padding: 6px 14px;
-    border: 1px solid var(--border);
-    background: transparent;
-    color: var(--muted);
-    font-family: 'DM Mono', monospace;
-    font-size: 11px;
-    cursor: pointer;
-    border-radius: 2px;
-    transition: all 0.2s;
-    letter-spacing: 0.05em;
-  }
-
-  .nav-pill.active, .nav-pill:hover {
-    border-color: var(--green);
-    color: var(--green);
-    background: rgba(0,237,100,0.06);
-  }
-
-  /* HERO */
-  .hero {
-    padding: 60px 0 40px;
-    text-align: center;
-  }
-
-  .tag {
-    display: inline-block;
-    border: 1px solid var(--green);
-    color: var(--green);
-    font-size: 11px;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    padding: 4px 14px;
-    margin-bottom: 20px;
-  }
-
-  h1 {
-    font-family: 'Syne', sans-serif;
-    font-size: clamp(36px, 5vw, 64px);
-    font-weight: 800;
-    line-height: 1.05;
-    letter-spacing: -0.02em;
-    margin-bottom: 16px;
-  }
-
-  h1 span { color: var(--green); }
-
-  .hero-sub {
-    color: var(--muted);
-    font-size: 14px;
-    max-width: 500px;
-    margin: 0 auto;
-    line-height: 1.7;
-  }
-
-  /* SECTION TABS */
-  .sections {
-    display: flex;
-    gap: 2px;
-    margin: 40px 0 0;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .sec-tab {
-    padding: 12px 20px;
-    background: transparent;
-    border: none;
-    color: var(--muted);
-    font-family: 'DM Mono', monospace;
-    font-size: 12px;
-    letter-spacing: 0.08em;
-    cursor: pointer;
-    border-bottom: 2px solid transparent;
-    transition: all 0.2s;
-    text-transform: uppercase;
-  }
-
-  .sec-tab.active {
-    color: var(--green);
-    border-bottom-color: var(--green);
-  }
-
-  .sec-tab:hover:not(.active) { color: var(--text); }
-
-  /* PANELS */
-  .panel { display: none; padding: 40px 0; }
-  .panel.active { display: block; }
-
-  /* ===== PANEL 1: THE PROBLEM ===== */
-  .problem-viz {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 32px;
-    margin-bottom: 32px;
-  }
-
-  .problem-title {
-    font-family: 'Syne', sans-serif;
-    font-size: 20px;
-    font-weight: 700;
-    margin-bottom: 24px;
-  }
-
-  .workload-arena {
-    position: relative;
-    background: var(--mid);
-    border-radius: 4px;
-    padding: 24px;
-    min-height: 200px;
-    overflow: hidden;
-  }
-
-  .arena-label {
-    font-size: 11px;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 16px;
-  }
-
-  .resource-bar-wrap {
-    margin-bottom: 20px;
-  }
-
-  .resource-label {
-    display: flex;
-    justify-content: space-between;
-    font-size: 12px;
-    color: var(--muted);
-    margin-bottom: 6px;
-  }
-
-  .resource-bar {
-    height: 20px;
-    background: var(--black);
-    border-radius: 2px;
-    overflow: hidden;
-    position: relative;
-  }
-
-  .resource-fill {
-    height: 100%;
-    border-radius: 2px;
-    transition: width 0.6s ease;
-    position: relative;
-  }
-
-  .resource-fill::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%);
-    animation: shimmer 2s infinite;
-  }
-
-  @keyframes shimmer {
-    0% { transform: translateX(-100%); }
-    100% { transform: translateX(100%); }
-  }
-
-  .workload-cards {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-    margin-top: 20px;
-  }
-
-  .wcard {
-    background: var(--black);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 14px;
-    cursor: pointer;
-    transition: all 0.2s;
-    position: relative;
-  }
-
-  .wcard:hover { border-color: var(--green); }
-  .wcard.active-card { border-color: var(--amber); }
-  .wcard.stressed { border-color: var(--red); animation: pulse-red 1s ease infinite alternate; }
-
-  @keyframes pulse-red {
-    from { box-shadow: 0 0 0 0 rgba(255,107,107,0); }
-    to { box-shadow: 0 0 12px 2px rgba(255,107,107,0.3); }
-  }
-
-  .wcard-icon { font-size: 20px; margin-bottom: 8px; }
-  .wcard-name { font-size: 12px; font-weight: 500; margin-bottom: 4px; }
-  .wcard-stat { font-size: 11px; color: var(--muted); }
-  .wcard-latency { font-size: 13px; font-weight: 600; margin-top: 6px; }
-
-  .simulate-btn {
-    display: block;
-    width: 100%;
-    margin-top: 20px;
-    padding: 14px;
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--text);
-    font-family: 'DM Mono', monospace;
-    font-size: 13px;
-    cursor: pointer;
-    border-radius: 2px;
-    transition: all 0.2s;
-    letter-spacing: 0.05em;
-  }
-
-  .simulate-btn:hover { border-color: var(--green); color: var(--green); background: rgba(0,237,100,0.05); }
-  .simulate-btn.running { border-color: var(--red); color: var(--red); }
-
-  .problem-callouts {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
-  }
-
-  .callout {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-left: 3px solid var(--red);
-    padding: 20px;
-    border-radius: 0 4px 4px 0;
-  }
-
-  .callout-num {
-    font-family: 'Syne', sans-serif;
-    font-size: 32px;
-    font-weight: 800;
-    color: var(--red);
-    line-height: 1;
-    margin-bottom: 6px;
-  }
-
-  .callout-text { font-size: 12px; color: var(--muted); line-height: 1.6; }
-
-  /* ===== PANEL 2: THE SOLUTION ===== */
-  .solution-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
-    margin-bottom: 32px;
-  }
-
-  .solution-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 24px;
-    cursor: pointer;
-    transition: all 0.25s;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .solution-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 2px;
-    background: var(--green);
-    transform: scaleX(0);
-    transition: transform 0.3s;
-    transform-origin: left;
-  }
-
-  .solution-card:hover::before,
-  .solution-card.selected::before { transform: scaleX(1); }
-
-  .solution-card:hover, .solution-card.selected {
-    border-color: rgba(0,237,100,0.3);
-    background: rgba(0,237,100,0.04);
-  }
-
-  .sol-icon { font-size: 28px; margin-bottom: 12px; }
-  .sol-name {
-    font-family: 'Syne', sans-serif;
-    font-size: 16px;
-    font-weight: 700;
-    margin-bottom: 8px;
-  }
-  .sol-desc { font-size: 12px; color: var(--muted); line-height: 1.7; margin-bottom: 12px; }
-
-  .sol-detail {
-    display: none;
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px solid var(--border);
-  }
-
-  .solution-card.selected .sol-detail { display: block; }
-
-  .sol-detail-item {
-    display: flex;
-    gap: 8px;
-    font-size: 12px;
-    color: var(--text);
-    margin-bottom: 8px;
-    line-height: 1.5;
-  }
-
-  .sol-detail-item::before {
-    content: '→';
-    color: var(--green);
-    flex-shrink: 0;
-  }
-
-  .badge {
-    display: inline-block;
-    padding: 3px 10px;
-    background: rgba(0,237,100,0.12);
-    border: 1px solid rgba(0,237,100,0.3);
-    color: var(--green);
-    font-size: 10px;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    border-radius: 2px;
-  }
-
-  /* Architecture diagram */
-  .arch-diagram {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 32px;
-    margin-top: 8px;
-  }
-
-  .arch-title {
-    font-family: 'Syne', sans-serif;
-    font-size: 16px;
-    font-weight: 700;
-    margin-bottom: 24px;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    font-size: 12px;
-  }
-
-  .arch-row {
-    display: flex;
-    gap: 12px;
-    align-items: center;
-    margin-bottom: 12px;
-  }
-
-  .arch-node {
-    flex: 1;
-    background: var(--mid);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 12px 16px;
-    text-align: center;
-    font-size: 12px;
-    position: relative;
-  }
-
-  .arch-node.primary { border-color: var(--green); }
-  .arch-node.analytics { border-color: var(--blue); }
-  .arch-node.search { border-color: var(--amber); }
-  .arch-node.archive { border-color: var(--muted); }
-
-  .arch-node-label {
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    margin-bottom: 4px;
-  }
-
-  .arch-node.primary .arch-node-label { color: var(--green); }
-  .arch-node.analytics .arch-node-label { color: var(--blue); }
-  .arch-node.search .arch-node-label { color: var(--amber); }
-  .arch-node.archive .arch-node-label { color: var(--muted); }
-
-  .arch-node-name { font-weight: 500; font-size: 13px; }
-
-  .arch-arrow {
-    color: var(--muted);
-    font-size: 18px;
-    flex-shrink: 0;
-  }
-
-  .arch-source {
-    background: var(--black);
-    border: 1px dashed var(--border);
-    border-radius: 4px;
-    padding: 12px 20px;
-    text-align: center;
-    font-size: 12px;
-    color: var(--muted);
-  }
-
-  /* ===== PANEL 3: VALUE ===== */
-  .value-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
-    margin-bottom: 32px;
-  }
-
-  .value-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 24px;
-    transition: all 0.2s;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .value-card:hover { transform: translateY(-2px); border-color: rgba(0,237,100,0.3); }
-
-  .value-metric {
-    font-family: 'Syne', sans-serif;
-    font-size: 40px;
-    font-weight: 800;
-    color: var(--green);
-    line-height: 1;
-    margin-bottom: 6px;
-  }
-
-  .value-label {
-    font-size: 13px;
-    font-weight: 500;
-    margin-bottom: 8px;
-  }
-
-  .value-desc { font-size: 12px; color: var(--muted); line-height: 1.6; }
-
-  .before-after {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 32px;
-    margin-bottom: 24px;
-  }
-
-  .ba-title {
-    font-family: 'Syne', sans-serif;
-    font-size: 18px;
-    font-weight: 700;
-    margin-bottom: 24px;
-  }
-
-  .ba-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-
-  .ba-col h4 {
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.15em;
-    margin-bottom: 16px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .ba-col.before h4 { color: var(--red); border-bottom-color: rgba(255,107,107,0.3); }
-  .ba-col.after h4 { color: var(--green); border-bottom-color: rgba(0,237,100,0.3); }
-
-  .ba-item {
-    display: flex;
-    gap: 10px;
-    font-size: 13px;
-    margin-bottom: 12px;
-    line-height: 1.5;
-  }
-
-  .ba-item .icon { flex-shrink: 0; }
-
-  /* ===== PANEL 4: DISCOVERY ===== */
-  .discovery-intro {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-left: 3px solid var(--green);
-    border-radius: 0 4px 4px 0;
-    padding: 20px 24px;
-    margin-bottom: 24px;
-    font-size: 13px;
-    color: var(--muted);
-    line-height: 1.7;
-  }
-
-  .q-category {
-    margin-bottom: 24px;
-  }
-
-  .q-cat-header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 14px;
-    cursor: pointer;
-    padding: 14px 20px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    transition: all 0.2s;
-  }
-
-  .q-cat-header:hover { border-color: rgba(0,237,100,0.3); }
-
-  .q-cat-header.open {
-    border-bottom-color: transparent;
-    border-radius: 4px 4px 0 0;
-    border-color: rgba(0,237,100,0.3);
-    background: rgba(0,237,100,0.04);
-  }
-
-  .q-cat-icon { font-size: 20px; }
-
-  .q-cat-title {
-    font-family: 'Syne', sans-serif;
-    font-size: 15px;
-    font-weight: 700;
-    flex: 1;
-  }
-
-  .q-cat-count {
-    font-size: 11px;
-    color: var(--muted);
-  }
-
-  .q-chevron {
-    color: var(--muted);
-    transition: transform 0.2s;
-    font-size: 12px;
-  }
-
-  .q-cat-header.open .q-chevron { transform: rotate(180deg); }
-
-  .q-list {
-    display: none;
-    border: 1px solid rgba(0,237,100,0.3);
-    border-top: none;
-    border-radius: 0 0 4px 4px;
-    padding: 8px 0;
-    background: rgba(0,237,100,0.02);
-  }
-
-  .q-cat-header.open + .q-list { display: block; }
-
-  .q-item {
-    padding: 14px 20px;
-    border-bottom: 1px solid rgba(255,255,255,0.04);
-    cursor: pointer;
-    transition: background 0.15s;
-    display: flex;
-    gap: 12px;
-    align-items: flex-start;
-  }
-
-  .q-item:last-child { border-bottom: none; }
-  .q-item:hover { background: rgba(0,237,100,0.05); }
-
-  .q-bullet {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--green);
-    flex-shrink: 0;
-    margin-top: 6px;
-  }
-
-  .q-text { font-size: 13px; line-height: 1.6; color: var(--text); flex: 1; }
-
-  .q-copy-btn {
-    flex-shrink: 0;
-    padding: 4px 10px;
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--muted);
-    font-family: 'DM Mono', monospace;
-    font-size: 10px;
-    cursor: pointer;
-    border-radius: 2px;
-    transition: all 0.2s;
-    opacity: 0;
-    letter-spacing: 0.05em;
-  }
-
-  .q-item:hover .q-copy-btn { opacity: 1; }
-  .q-copy-btn:hover { border-color: var(--green); color: var(--green); }
-  .q-copy-btn.copied { border-color: var(--green); color: var(--green); }
-
-  /* FOOTER */
-  footer {
-    border-top: 1px solid var(--border);
-    padding: 24px 0;
-    margin-top: 60px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .footer-text { font-size: 11px; color: var(--muted); letter-spacing: 0.05em; }
-
-  /* Tooltip */
-  .tooltip {
-    position: fixed;
-    background: var(--green);
-    color: var(--black);
-    font-size: 11px;
-    padding: 6px 12px;
-    border-radius: 2px;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.2s;
-    z-index: 1000;
-    font-weight: 600;
-    letter-spacing: 0.05em;
-  }
-
-  .tooltip.show { opacity: 1; }
-
-  @media (max-width: 700px) {
-    .workload-cards, .problem-callouts, .solution-grid, .value-grid, .ba-grid {
-      grid-template-columns: 1fr;
-    }
-    .nav-pills { display: none; }
-  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0A1628; font-family: Georgia, serif; color: #E8F4FF; }
 </style>
 </head>
 <body>
+<div id="root"></div>
+<script type="text/babel">
+const green = "#00ED64";
+const bg = "#0A1628";
+const card = "#0F1F3D";
+const cardBorder = "#1A3560";
+const text = "#E8F4FF";
+const muted = "#7A9CC0";
 
-<div class="tooltip" id="tooltip">Copied!</div>
+const styles = {
+  page: { background: bg, minHeight: "100vh", fontFamily: "Georgia, serif", color: text },
+  nav: {
+    display: "flex", alignItems: "center", justifyContent: "space-between",
+    padding: "20px 40px", borderBottom: `1px solid ${cardBorder}`,
+    background: "rgba(10,22,40,0.95)", position: "sticky", top: 0, zIndex: 100
+  },
+  navBrand: { display: "flex", alignItems: "center", gap: 10 },
+  leaf: {
+    width: 22, height: 22, flexShrink: 0, display: "flex", alignItems: "center"
+  },
+  navTitle: { color: green, fontFamily: "Georgia, serif", fontSize: 14, fontStyle: "italic", letterSpacing: "0.05em" },
+  navLinks: { display: "flex", gap: 24 },
+  navLink: { color: muted, fontSize: 13, textDecoration: "none", fontStyle: "italic" },
+  hero: {
+    padding: "80px 40px 60px", maxWidth: 900, margin: "0 auto", textAlign: "center"
+  },
+  heroEyebrow: {
+    display: "inline-flex", alignItems: "center", gap: 8,
+    fontSize: 12, letterSpacing: "0.2em", textTransform: "uppercase",
+    color: muted, marginBottom: 20, fontFamily: "Georgia, serif", fontStyle: "italic"
+  },
+  heroDot: {
+    width: 6, height: 6, background: green, borderRadius: "50%",
+    animation: "pulse 2s ease infinite"
+  },
+  heroH1: {
+    fontSize: "clamp(42px, 6vw, 72px)", fontWeight: "bold",
+    lineHeight: 1.05, letterSpacing: "-0.02em", marginBottom: 24,
+    fontFamily: "Georgia, serif"
+  },
+  heroGreen: { color: green },
+  heroSub: { fontSize: 16, color: muted, maxWidth: 560, margin: "0 auto", lineHeight: 1.8, fontStyle: "italic" },
+  tabRow: {
+    display: "flex", gap: 0, borderBottom: `1px solid ${cardBorder}`,
+    maxWidth: 900, margin: "0 auto 0", padding: "0 40px"
+  },
+  tab: {
+    padding: "12px 20px", background: "transparent", border: "none",
+    color: muted, fontFamily: "Georgia, serif", fontSize: 13,
+    fontStyle: "italic", cursor: "pointer", borderBottom: "2px solid transparent",
+    transition: "all 0.2s", letterSpacing: "0.04em"
+  },
+  tabActive: { color: green, borderBottom: `2px solid ${green}` },
+  body: { maxWidth: 900, margin: "0 auto", padding: "40px 40px 80px" },
+  sectionTitle: {
+    fontFamily: "Georgia, serif", fontSize: 26, fontWeight: "bold",
+    marginBottom: 8, letterSpacing: "-0.01em"
+  },
+  sectionSub: { color: muted, fontSize: 14, fontStyle: "italic", marginBottom: 32, lineHeight: 1.7 },
+  grid2: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 32 },
+  grid3: { display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16, marginBottom: 32 },
+  infoCard: {
+    background: card, border: `1px solid ${cardBorder}`, borderRadius: 6,
+    padding: 24, position: "relative", overflow: "hidden"
+  },
+  infoCardAccent: {
+    position: "absolute", top: 0, left: 0, right: 0, height: 3, background: green
+  },
+  cardLabel: { fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: green, marginBottom: 10 },
+  cardTitle: { fontFamily: "Georgia, serif", fontSize: 18, fontWeight: "bold", marginBottom: 8 },
+  cardBody: { fontSize: 13, color: muted, lineHeight: 1.7, fontStyle: "italic" },
+  metricNum: { fontFamily: "Georgia, serif", fontSize: 44, fontWeight: "bold", color: green, lineHeight: 1, marginBottom: 6 },
+  metricLabel: { fontSize: 13, fontWeight: "bold", marginBottom: 8 },
+  divider: { height: 1, background: `linear-gradient(90deg, ${green} 0%, transparent 60%)`, opacity: 0.2, margin: "40px 0" },
+  simBox: {
+    background: card, border: `1px solid ${cardBorder}`, borderRadius: 6, padding: 28, marginBottom: 32
+  },
+  simLabel: { fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: muted, marginBottom: 20, fontStyle: "italic" },
+  barWrap: { marginBottom: 16 },
+  barRow: { display: "flex", justifyContent: "space-between", fontSize: 12, color: muted, marginBottom: 6, fontStyle: "italic" },
+  barTrack: { height: 18, background: bg, borderRadius: 3, overflow: "hidden" },
+  barFill: { height: "100%", borderRadius: 3, transition: "width 0.5s ease, background 0.5s ease" },
+  wCards: { display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginTop: 20 },
+  wCard: {
+    background: bg, border: `1px solid ${cardBorder}`, borderRadius: 6,
+    padding: 16, transition: "all 0.2s"
+  },
+  wCardIcon: { fontSize: 22, marginBottom: 8 },
+  wCardName: { fontSize: 13, fontWeight: "bold", marginBottom: 4, fontFamily: "Georgia, serif" },
+  wCardStat: { fontSize: 11, color: muted, fontStyle: "italic", marginBottom: 6 },
+  wCardLatency: { fontSize: 14, fontWeight: "bold" },
+  simBtn: {
+    display: "block", width: "100%", marginTop: 20, padding: "14px 0",
+    background: "transparent", border: `1px solid ${cardBorder}`,
+    color: text, fontFamily: "Georgia, serif", fontSize: 13, fontStyle: "italic",
+    cursor: "pointer", borderRadius: 4, transition: "all 0.2s", letterSpacing: "0.03em"
+  },
+  qAccordion: { marginBottom: 16 },
+  qHeader: {
+    display: "flex", alignItems: "center", gap: 12, padding: "16px 20px",
+    background: card, border: `1px solid ${cardBorder}`, borderRadius: 6,
+    cursor: "pointer", transition: "all 0.2s", userSelect: "none"
+  },
+  qHeaderOpen: { borderRadius: "6px 6px 0 0", borderBottomColor: "transparent", borderColor: `${green}44` },
+  qHeaderIcon: { fontSize: 20 },
+  qHeaderTitle: { fontFamily: "Georgia, serif", fontSize: 15, fontWeight: "bold", flex: 1 },
+  qHeaderCount: { fontSize: 11, color: muted, fontStyle: "italic" },
+  qList: {
+    border: `1px solid ${green}44`, borderTop: "none",
+    borderRadius: "0 0 6px 6px", padding: "6px 0",
+    background: "rgba(0,237,100,0.02)"
+  },
+  qItem: {
+    display: "flex", gap: 12, alignItems: "flex-start",
+    padding: "14px 20px", borderBottom: "1px solid rgba(255,255,255,0.04)",
+    cursor: "pointer", transition: "background 0.15s"
+  },
+  qBullet: { width: 6, height: 6, background: green, borderRadius: "50%", flexShrink: 0, marginTop: 7 },
+  qText: { fontSize: 13, color: text, lineHeight: 1.65, flex: 1, fontStyle: "italic" },
+  qCopy: {
+    flexShrink: 0, padding: "4px 10px", background: "transparent",
+    border: `1px solid ${cardBorder}`, color: muted, fontFamily: "Georgia, serif",
+    fontSize: 10, cursor: "pointer", borderRadius: 3, letterSpacing: "0.05em"
+  },
+  beforeAfter: {
+    display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24,
+    background: card, border: `1px solid ${cardBorder}`, borderRadius: 6, padding: 28, marginBottom: 32
+  },
+  baHead: { fontSize: 12, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 16, paddingBottom: 10, borderBottom: `1px solid ${cardBorder}` },
+  baItem: { display: "flex", gap: 10, fontSize: 13, marginBottom: 12, lineHeight: 1.6, fontStyle: "italic" },
+  calloutRow: { display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16, marginBottom: 32 },
+  callout: {
+    background: card, borderLeft: "3px solid #FF6B6B",
+    border: `1px solid ${cardBorder}`, borderRadius: "0 6px 6px 0", padding: 22
+  },
+  calloutNum: { fontFamily: "Georgia, serif", fontSize: 36, fontWeight: "bold", color: "#FF6B6B", lineHeight: 1, marginBottom: 8 },
+  calloutText: { fontSize: 12, color: muted, lineHeight: 1.7, fontStyle: "italic" },
+  archBox: {
+    background: card, border: `1px solid ${cardBorder}`, borderRadius: 6, padding: 28, marginTop: 8
+  },
+  archLabel: { fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: muted, marginBottom: 20, fontStyle: "italic" },
+  archSource: {
+    background: bg, border: `1px dashed ${cardBorder}`, borderRadius: 4,
+    padding: "12px 20px", textAlign: "center", fontSize: 13, color: muted, fontStyle: "italic"
+  },
+  archNodes: { display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginTop: 16 },
+  archNode: {
+    background: `${bg}cc`, border: `1px solid ${cardBorder}`, borderRadius: 4,
+    padding: "14px 16px", textAlign: "center"
+  },
+  archNodeLabel: { fontSize: 10, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 6 },
+  archNodeName: { fontSize: 13, fontWeight: "bold", fontFamily: "Georgia, serif" },
+  tooltip: {
+    position: "fixed", background: green, color: bg, fontSize: 11,
+    padding: "6px 14px", borderRadius: 3, pointerEvents: "none",
+    fontFamily: "Georgia, serif", fontStyle: "italic", fontWeight: "bold", zIndex: 1000
+  },
+  footer: {
+    borderTop: `1px solid ${cardBorder}`, padding: "28px 40px",
+    display: "flex", justifyContent: "space-between", alignItems: "center",
+    maxWidth: 900, margin: "0 auto"
+  },
+  footerText: { fontSize: 12, color: muted, fontStyle: "italic" }
+};
 
-<header>
-  <div class="container">
-    <div class="header-inner">
-      <div class="logo-mark">
-        <div class="leaf"></div>
-        <span class="brand">MongoDB Atlas</span>
-      </div>
-      <nav class="nav-pills">
-        <button class="nav-pill active" onclick="setTab(0)">The Problem</button>
-        <button class="nav-pill" onclick="setTab(1)">The Solution</button>
-        <button class="nav-pill" onclick="setTab(2)">The Value</button>
-        <button class="nav-pill" onclick="setTab(3)">Discovery Qs</button>
-      </nav>
-    </div>
-  </div>
-</header>
+const tabs = ["01 — Problem", "02 — Solution", "03 — Value", "04 — Discovery"];
 
-<div class="container">
-  <div class="hero">
-    <div class="tag">Solutions Architecture</div>
-    <h1>Workload<br><span>Isolation</span></h1>
-    <p class="hero-sub">Run every workload at full speed — without sacrificing stability, freshness, or developer sanity.</p>
-  </div>
+function App() {
+  const [activeTab, setActiveTab] = React.useState(0);
+  const [simRunning, setSimRunning] = React.useState(false);
+  const [stressed, setStressed] = React.useState(false);
+  const [cpu, setCpu] = React.useState(32);
+  const [mem, setMem] = React.useState(28);
+  const [io, setIo] = React.useState(15);
+  const [cpuColor, setCpuColor] = React.useState(green);
+  const [memColor, setMemColor] = React.useState("#4DB8FF");
+  const [ioColor, setIoColor] = React.useState("#FFB347");
+  const [appLatency, setAppLatency] = React.useState("4ms avg");
+  const [appLatencyColor, setAppLatencyColor] = React.useState(green);
+  const [analyticsStatus, setAnalyticsStatus] = React.useState("Idle");
+  const [analyticsColor, setAnalyticsColor] = React.useState(muted);
+  const [reportStatus, setReportStatus] = React.useState("Normal");
+  const [reportColor, setReportColor] = React.useState(green);
+  const [selectedSol, setSelectedSol] = React.useState(null);
+  const [openQ, setOpenQ] = React.useState(0);
+  const [tooltip, setTooltip] = React.useState({ show: false, x: 0, y: 0 });
 
-  <div class="sections">
-    <button class="sec-tab active" onclick="setTab(0)">01 — Problem</button>
-    <button class="sec-tab" onclick="setTab(1)">02 — Solution</button>
-    <button class="sec-tab" onclick="setTab(2)">03 — Value</button>
-    <button class="sec-tab" onclick="setTab(3)">04 — Discovery</button>
-  </div>
+  React.useEffect(() => {
+    const move = e => setTooltip(t => ({ ...t, x: e.clientX + 12, y: e.clientY - 8 }));
+    window.addEventListener("mousemove", move);
+    return () => window.removeEventListener("mousemove", move);
+  }, []);
 
-  <!-- PANEL 1: PROBLEM -->
-  <div class="panel active" id="panel-0">
-    <div class="problem-viz">
-      <div class="problem-title">Without Isolation — One Database, Competing Workloads</div>
-      <div class="workload-arena">
-        <div class="arena-label">// shared resource pool — click "Run Analytics" to simulate contention</div>
-        <div class="resource-bar-wrap">
-          <div class="resource-label"><span>CPU</span><span id="cpu-pct">32%</span></div>
-          <div class="resource-bar"><div class="resource-fill" id="cpu-bar" style="width:32%; background: var(--green);"></div></div>
-        </div>
-        <div class="resource-bar-wrap">
-          <div class="resource-label"><span>Memory</span><span id="mem-pct">28%</span></div>
-          <div class="resource-bar"><div class="resource-fill" id="mem-bar" style="width:28%; background: var(--blue);"></div></div>
-        </div>
-        <div class="resource-bar-wrap">
-          <div class="resource-label"><span>I/O</span><span id="io-pct">15%</span></div>
-          <div class="resource-bar"><div class="resource-fill" id="io-bar" style="width:15%; background: var(--amber);"></div></div>
-        </div>
-        <div class="workload-cards">
-          <div class="wcard" id="wcard-app">
-            <div class="wcard-icon">⚡</div>
-            <div class="wcard-name">App Transactions</div>
-            <div class="wcard-stat">OLTP — high frequency</div>
-            <div class="wcard-latency" id="app-latency" style="color: var(--green);">4ms avg</div>
-          </div>
-          <div class="wcard" id="wcard-report">
-            <div class="wcard-icon">📊</div>
-            <div class="wcard-name">Reporting / BI</div>
-            <div class="wcard-stat">Long-running reads</div>
-            <div class="wcard-latency" id="report-latency" style="color: var(--green);">Normal</div>
-          </div>
-          <div class="wcard" id="wcard-analytics">
-            <div class="wcard-icon">🔍</div>
-            <div class="wcard-name">Analytics Query</div>
-            <div class="wcard-stat">Full collection scan</div>
-            <div class="wcard-latency" id="analytics-status" style="color: var(--muted);">Idle</div>
-          </div>
-        </div>
-        <button class="simulate-btn" id="sim-btn" onclick="simulateContention()">▶ Run Analytics Query — Watch What Happens</button>
-      </div>
-    </div>
-
-    <div class="problem-callouts">
-      <div class="callout">
-        <div class="callout-num">10×</div>
-        <div class="callout-text">Latency spike on OLTP transactions when a single unoptimized analytics query hits the same cluster</div>
-      </div>
-      <div class="callout">
-        <div class="callout-num">3+</div>
-        <div class="callout-text">Separate data stores teams are forced to maintain just to protect production performance</div>
-      </div>
-      <div class="callout">
-        <div class="callout-num">24h</div>
-        <div class="callout-text">Average data lag analysts experience when working from warehouse exports instead of live data</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- PANEL 2: SOLUTION -->
-  <div class="panel" id="panel-1">
-    <div style="margin-bottom: 12px; color: var(--muted); font-size: 13px;">Click each capability to learn more</div>
-    <div class="solution-grid">
-      <div class="solution-card" onclick="toggleSol(this)">
-        <div class="sol-icon">🔵</div>
-        <div class="sol-name">Analytics Nodes</div>
-        <div class="sol-desc">Dedicated replica set members tagged exclusively for analytical workloads. Zero ETL, always fresh data.</div>
-        <div class="badge">Atlas Cluster</div>
-        <div class="sol-detail">
-          <div class="sol-detail-item">Reads are routed to analytics nodes via read preference tags — never touch primary</div>
-          <div class="sol-detail-item">Can run M0–M700 independently, sized for analytics, not OLTP</div>
-          <div class="sol-detail-item">Replication lag typically under 1 second — effectively real-time</div>
-          <div class="sol-detail-item">No code changes needed — just update connection string read preference</div>
-        </div>
-      </div>
-      <div class="solution-card" onclick="toggleSol(this)">
-        <div class="sol-icon">🟡</div>
-        <div class="sol-name">Atlas Search</div>
-        <div class="sol-desc">Lucene-based full-text and vector search running on dedicated mongot processes — completely isolated from CRUD.</div>
-        <div class="badge">Search Nodes</div>
-        <div class="sol-detail">
-          <div class="sol-detail-item">Search indexes managed by mongot process — not the mongod that handles your writes</div>
-          <div class="sol-detail-item">Supports fuzzy match, semantic (vector), faceted, and hybrid search</div>
-          <div class="sol-detail-item">Search tier can scale independently from your database tier</div>
-          <div class="sol-detail-item">No separate Elasticsearch cluster to sync and maintain</div>
-        </div>
-      </div>
-      <div class="solution-card" onclick="toggleSol(this)">
-        <div class="sol-icon">🟢</div>
-        <div class="sol-name">Online Archive</div>
-        <div class="sol-desc">Auto-tier cold data to object storage. Keep hot data in Atlas, query everything with the same driver.</div>
-        <div class="badge">Data Tiering</div>
-        <div class="sol-detail">
-          <div class="sol-detail-item">Define archival rules by date or custom field — fully automated</div>
-          <div class="sol-detail-item">Archived data stored in Atlas-managed S3-compatible object storage</div>
-          <div class="sol-detail-item">Query hot + cold data transparently via Data Federation</div>
-          <div class="sol-detail-item">Keeps operational cluster lean, reducing IOPS costs significantly</div>
-        </div>
-      </div>
-      <div class="solution-card" onclick="toggleSol(this)">
-        <div class="sol-icon">🔴</div>
-        <div class="sol-name">Data Federation</div>
-        <div class="sol-desc">Query across Atlas clusters, Online Archive, S3, and HTTP sources — without moving data.</div>
-        <div class="badge">Federated Queries</div>
-        <div class="sol-detail">
-          <div class="sol-detail-item">Federated endpoint runs on Atlas infrastructure, not your cluster</div>
-          <div class="sol-detail-item">MQL and $lookup across heterogeneous sources in a single query</div>
-          <div class="sol-detail-item">Supports CSV, JSON, Parquet, BSON in S3 alongside live Atlas data</div>
-          <div class="sol-detail-item">Great for data mesh patterns — each domain exposes its own cluster</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="arch-diagram">
-      <div class="arch-title">// Typical isolated architecture</div>
-      <div class="arch-source">App Traffic · BI Tools · Search · Batch Jobs · Analysts</div>
-      <div style="text-align:center; color: var(--muted); font-size: 20px; margin: 10px 0;">↓ routed by workload type</div>
-      <div class="arch-row">
-        <div class="arch-node primary">
-          <div class="arch-node-label">Primary</div>
-          <div class="arch-node-name">OLTP Writes + Reads</div>
-        </div>
-        <div class="arch-node analytics">
-          <div class="arch-node-label">Analytics Node</div>
-          <div class="arch-node-name">BI / Reporting</div>
-        </div>
-        <div class="arch-node search">
-          <div class="arch-node-label">Search Node</div>
-          <div class="arch-node-name">Full-Text / Vector</div>
-        </div>
-        <div class="arch-node archive">
-          <div class="arch-node-label">Online Archive</div>
-          <div class="arch-node-name">Historical Data</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- PANEL 3: VALUE -->
-  <div class="panel" id="panel-2">
-    <div class="value-grid">
-      <div class="value-card">
-        <div class="value-metric">0</div>
-        <div class="value-label">ETL Pipelines to Maintain</div>
-        <div class="value-desc">Analytics runs on live replica data. No extraction, no transformation, no nightly sync jobs to break.</div>
-      </div>
-      <div class="value-card">
-        <div class="value-metric">&lt;1s</div>
-        <div class="value-label">Analytics Data Lag</div>
-        <div class="value-desc">Replication to analytics nodes is near-real-time, vs. 24+ hours from a nightly warehouse export.</div>
-      </div>
-      <div class="value-card">
-        <div class="value-metric">100%</div>
-        <div class="value-label">SLA Protection</div>
-        <div class="value-desc">App transactions are never impacted by analytics queries — they run on dedicated resources.</div>
-      </div>
-      <div class="value-card">
-        <div class="value-metric">1</div>
-        <div class="value-label">Platform to Operate</div>
-        <div class="value-desc">Replace MongoDB + Elasticsearch + Redshift + S3 ETL with a single Atlas configuration.</div>
-      </div>
-      <div class="value-card">
-        <div class="value-metric">↓60%</div>
-        <div class="value-label">Infrastructure Cost</div>
-        <div class="value-desc">Right-size each tier independently. Don't over-provision OLTP to handle batch analytics spikes.</div>
-      </div>
-      <div class="value-card">
-        <div class="value-metric">1 API</div>
-        <div class="value-label">One Data Model, All Workloads</div>
-        <div class="value-desc">Developers use the same MQL driver, same document schema across every workload type.</div>
-      </div>
-    </div>
-
-    <div class="before-after">
-      <div class="ba-title">The Architecture Transformation</div>
-      <div class="ba-grid">
-        <div class="ba-col before">
-          <h4>❌ Before Atlas Workload Isolation</h4>
-          <div class="ba-item"><span class="icon">🔴</span> Analytics queries crash production during peak hours</div>
-          <div class="ba-item"><span class="icon">🔴</span> Nightly ETL to warehouse — analysts work with day-old data</div>
-          <div class="ba-item"><span class="icon">🔴</span> Separate Elasticsearch cluster to sync and maintain</div>
-          <div class="ba-item"><span class="icon">🔴</span> Over-provisioned primary cluster to absorb all workloads</div>
-          <div class="ba-item"><span class="icon">🔴</span> Three teams, three platforms, three data copies</div>
-          <div class="ba-item"><span class="icon">🔴</span> SLA violations when scheduled reports run</div>
-        </div>
-        <div class="ba-col after">
-          <h4>✅ After Atlas Workload Isolation</h4>
-          <div class="ba-item"><span class="icon">🟢</span> Analytics nodes absorb all heavy reads — OLTP unaffected</div>
-          <div class="ba-item"><span class="icon">🟢</span> Analysts query live data with sub-second replication lag</div>
-          <div class="ba-item"><span class="icon">🟢</span> Atlas Search nodes replace Elasticsearch entirely</div>
-          <div class="ba-item"><span class="icon">🟢</span> Each tier sized and billed independently</div>
-          <div class="ba-item"><span class="icon">🟢</span> One Atlas cluster, one driver, one data model</div>
-          <div class="ba-item"><span class="icon">🟢</span> Guaranteed SLA with resource isolation by design</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- PANEL 4: DISCOVERY -->
-  <div class="panel" id="panel-3">
-    <div class="discovery-intro">
-      Use these questions to uncover pain, quantify impact, and build urgency. Hover any question and click <strong>copy</strong> to grab it instantly for your call notes.
-    </div>
-
-    <div class="q-category">
-      <div class="q-cat-header open" onclick="toggleQ(this)">
-        <div class="q-cat-icon">💥</div>
-        <div class="q-cat-title">Current Pain & Performance</div>
-        <div class="q-cat-count">4 questions</div>
-        <div class="q-chevron">▲</div>
-      </div>
-      <div class="q-list">
-        <div class="q-item">
-          <div class="q-bullet"></div>
-          <div class="q-text">"When your analytics team runs heavy queries, what happens to your application response times — and who feels it first?"</div>
-          <button class="q-copy-btn" onclick="copyQ(this)">copy</button>
-        </div>
-        <div class="q-item">
-          <div class="q-bullet"></div>
-          <div class="q-text">"Do you have SLAs on your transactional workload? How often do you breach them, and what's typically the cause?"</div>
-          <button class="q-copy-btn" onclick="copyQ(this)">copy</button>
-        </div>
-        <div class="q-item">
-          <div class="q-bullet"></div>
-          <div class="q-text">"Has a reporting job or batch process ever caused a production incident? What was the business impact?"</div>
-          <button class="q-copy-btn" onclick="copyQ(this)">copy</button>
-        </div>
-        <div class="q-item">
-          <div class="q-bullet"></div>
-          <div class="q-text">"Are there workloads you're not running today because you're worried they'd impact production?"</div>
-          <button class="q-copy-btn" onclick="copyQ(this)">copy</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="q-category">
-      <div class="q-cat-header" onclick="toggleQ(this)">
-        <div class="q-cat-icon">🔧</div>
-        <div class="q-cat-title">Data Pipeline Complexity</div>
-        <div class="q-cat-count">4 questions</div>
-        <div class="q-chevron">▼</div>
-      </div>
-      <div class="q-list">
-        <div class="q-item">
-          <div class="q-bullet"></div>
-          <div class="q-text">"How are you currently getting operational data to your BI or reporting tools? Walk me through that pipeline."</div>
-          <button class="q-copy-btn" onclick="copyQ(this)">copy</button>
-        </div>
-        <div class="q-item">
-          <div class="q-bullet"></div>
-          <div class="q-text">"How fresh is the data your analysts are working with — and has data staleness ever caused a bad business decision?"</div>
-          <button class="q-copy-btn" onclick="copyQ(this)">copy</button>
-        </div>
-        <div class="q-item">
-          <div class="q-bullet"></div>
-          <div class="q-text">"What's the engineering cost to build and maintain your ETL or replication pipelines today — in time and people?"</div>
-          <button class="q-copy-btn" onclick="copyQ(this)">copy</button>
-        </div>
-        <div class="q-item">
-          <div class="q-bullet"></div>
-          <div class="q-text">"How many separate databases or data stores are you managing to serve different teams — and what's the cost of keeping them in sync?"</div>
-          <button class="q-copy-btn" onclick="copyQ(this)">copy</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="q-category">
-      <div class="q-cat-header" onclick="toggleQ(this)">
-        <div class="q-cat-icon">🏢</div>
-        <div class="q-cat-title">Organizational & Team Friction</div>
-        <div class="q-cat-count">3 questions</div>
-        <div class="q-chevron">▼</div>
-      </div>
-      <div class="q-list">
-        <div class="q-item">
-          <div class="q-bullet"></div>
-          <div class="q-text">"Who owns your analytics infrastructure vs. your app database? Do those teams compete for resources or prioritization?"</div>
-          <button class="q-copy-btn" onclick="copyQ(this)">copy</button>
-        </div>
-        <div class="q-item">
-          <div class="q-bullet"></div>
-          <div class="q-text">"When a business stakeholder asks 'why is the app slow right now' — how do you diagnose and explain what's happening?"</div>
-          <button class="q-copy-btn" onclick="copyQ(this)">copy</button>
-        </div>
-        <div class="q-item">
-          <div class="q-bullet"></div>
-          <div class="q-text">"Are your developers having to learn and maintain multiple query languages or SDKs to serve different workload types?"</div>
-          <button class="q-copy-btn" onclick="copyQ(this)">copy</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="q-category">
-      <div class="q-cat-header" onclick="toggleQ(this)">
-        <div class="q-cat-icon">🚀</div>
-        <div class="q-cat-title">Future State & Strategic Direction</div>
-        <div class="q-cat-count">4 questions</div>
-        <div class="q-chevron">▼</div>
-      </div>
-      <div class="q-list">
-        <div class="q-item">
-          <div class="q-bullet"></div>
-          <div class="q-text">"As your data volumes grow, how are you thinking about scaling your analytics independently from your transactional layer?"</div>
-          <button class="q-copy-btn" onclick="copyQ(this)">copy</button>
-        </div>
-        <div class="q-item">
-          <div class="q-bullet"></div>
-          <div class="q-text">"If your analysts could query live operational data with zero risk to production, how would that change what they're able to build?"</div>
-          <button class="q-copy-btn" onclick="copyQ(this)">copy</button>
-        </div>
-        <div class="q-item">
-          <div class="q-bullet"></div>
-          <div class="q-text">"Are you considering a data warehouse or lakehouse? Is that driven by a capability gap, or by isolation concerns you're trying to solve?"</div>
-          <button class="q-copy-btn" onclick="copyQ(this)">copy</button>
-        </div>
-        <div class="q-item">
-          <div class="q-bullet"></div>
-          <div class="q-text">"If you could collapse three separate infrastructure stacks into one platform with guaranteed workload isolation — what would that be worth to your team in the next 12 months?"</div>
-          <button class="q-copy-btn" onclick="copyQ(this)">copy</button>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<footer>
-  <div class="container" style="display:flex; justify-content:space-between; width:100%;">
-    <div class="footer-text">MongoDB Atlas — Workload Isolation Explainer</div>
-    <div class="footer-text">Solutions Architecture</div>
-  </div>
-</footer>
-
-<script>
-  // Tab navigation
-  function setTab(idx) {
-    document.querySelectorAll('.panel').forEach((p,i) => p.classList.toggle('active', i===idx));
-    document.querySelectorAll('.sec-tab').forEach((t,i) => t.classList.toggle('active', i===idx));
-    document.querySelectorAll('.nav-pill').forEach((t,i) => t.classList.toggle('active', i===idx));
-  }
-
-  // Contention simulation
-  let simRunning = false;
-  let simTimeout = null;
-
-  function simulateContention() {
+  function simulate() {
     if (simRunning) return;
-    simRunning = true;
-    const btn = document.getElementById('sim-btn');
-    btn.textContent = '⚠ Analytics query running — watch OLTP latency spike...';
-    btn.classList.add('running');
-
-    const appCard = document.getElementById('wcard-app');
-    const analyticsCard = document.getElementById('wcard-analytics');
-    const reportCard = document.getElementById('wcard-report');
-    const appLatency = document.getElementById('app-latency');
-    const analyticsStatus = document.getElementById('analytics-status');
-    const reportLatency = document.getElementById('report-latency');
-
-    analyticsCard.classList.add('active-card');
-    analyticsStatus.textContent = 'Running...';
-    analyticsStatus.style.color = 'var(--amber)';
-
-    setResources(88, 91, 95, 'var(--red)', 'var(--red)', 'var(--red)');
-
+    setSimRunning(true);
+    setAnalyticsStatus("Running..."); setAnalyticsColor("#FFB347");
+    setCpu(89); setMem(92); setIo(96);
+    setCpuColor("#FF6B6B"); setMemColor("#FF6B6B"); setIoColor("#FF6B6B");
     setTimeout(() => {
-      appCard.classList.add('stressed');
-      appLatency.textContent = '847ms avg';
-      appLatency.style.color = 'var(--red)';
-      reportLatency.textContent = 'Queued';
-      reportLatency.style.color = 'var(--amber)';
-      reportCard.classList.add('stressed');
+      setStressed(true);
+      setAppLatency("847ms avg"); setAppLatencyColor("#FF6B6B");
+      setReportStatus("Queued"); setReportColor("#FFB347");
     }, 800);
-
     setTimeout(() => {
-      // Reset
-      appCard.classList.remove('stressed');
-      analyticsCard.classList.remove('active-card');
-      reportCard.classList.remove('stressed');
-      appLatency.textContent = '4ms avg';
-      appLatency.style.color = 'var(--green)';
-      analyticsStatus.textContent = 'Idle';
-      analyticsStatus.style.color = 'var(--muted)';
-      reportLatency.textContent = 'Normal';
-      reportLatency.style.color = 'var(--green)';
-      setResources(32, 28, 15, 'var(--green)', 'var(--blue)', 'var(--amber)');
-      btn.textContent = '▶ Run Analytics Query — Watch What Happens';
-      btn.classList.remove('running');
-      simRunning = false;
+      setStressed(false);
+      setSimRunning(false);
+      setAppLatency("4ms avg"); setAppLatencyColor(green);
+      setAnalyticsStatus("Idle"); setAnalyticsColor(muted);
+      setReportStatus("Normal"); setReportColor(green);
+      setCpu(32); setMem(28); setIo(15);
+      setCpuColor(green); setMemColor("#4DB8FF"); setIoColor("#FFB347");
     }, 4500);
   }
 
-  function setResources(cpu, mem, io, c1, c2, c3) {
-    document.getElementById('cpu-bar').style.width = cpu + '%';
-    document.getElementById('cpu-bar').style.background = c1;
-    document.getElementById('cpu-pct').textContent = cpu + '%';
-    document.getElementById('mem-bar').style.width = mem + '%';
-    document.getElementById('mem-bar').style.background = c2;
-    document.getElementById('mem-pct').textContent = mem + '%';
-    document.getElementById('io-bar').style.width = io + '%';
-    document.getElementById('io-bar').style.background = c3;
-    document.getElementById('io-pct').textContent = io + '%';
+  function copyQ(txt, e) {
+    navigator.clipboard.writeText(txt);
+    setTooltip(t => ({ ...t, show: true }));
+    setTimeout(() => setTooltip(t => ({ ...t, show: false })), 1500);
   }
 
-  // Solution card toggle
-  function toggleSol(card) {
-    const wasSelected = card.classList.contains('selected');
-    document.querySelectorAll('.solution-card').forEach(c => c.classList.remove('selected'));
-    if (!wasSelected) card.classList.add('selected');
-  }
+  const solutions = [
+    { icon: "🔵", name: "Analytics Nodes", badge: "Atlas Cluster", desc: "Dedicated replica set members tagged exclusively for analytical workloads. Zero ETL, always fresh data.", details: ["Reads routed via read preference tags — never touch primary", "Size independently from M0–M700 for analytics, not OLTP", "Replication lag typically under 1 second — effectively real-time", "No code changes needed — just update connection string read preference"] },
+    { icon: "🟡", name: "Atlas Search", badge: "Search Nodes", desc: "Lucene-based full-text and vector search on dedicated mongot processes — isolated from CRUD.", details: ["Search indexes managed by mongot — not the mongod handling writes", "Supports fuzzy, semantic (vector), faceted, and hybrid search", "Search tier scales independently from your database tier", "No separate Elasticsearch cluster to sync and maintain"] },
+    { icon: "🟢", name: "Online Archive", badge: "Data Tiering", desc: "Auto-tier cold data to object storage. Keep hot data in Atlas, query everything with the same driver.", details: ["Define archival rules by date or custom field — fully automated", "Archived data in Atlas-managed S3-compatible object storage", "Query hot + cold data transparently via Data Federation", "Keeps operational cluster lean, reducing IOPS costs significantly"] },
+    { icon: "🔴", name: "Data Federation", badge: "Federated Queries", desc: "Query across Atlas clusters, Online Archive, S3, and HTTP sources — without moving data.", details: ["Federated endpoint runs on Atlas infrastructure, not your cluster", "MQL and $lookup across heterogeneous sources in a single query", "Supports CSV, JSON, Parquet, BSON in S3 alongside live Atlas data", "Great for data mesh patterns — each domain exposes its own cluster"] },
+  ];
 
-  // Discovery Q accordion
-  function toggleQ(header) {
-    const wasOpen = header.classList.contains('open');
-    document.querySelectorAll('.q-cat-header').forEach(h => {
-      h.classList.remove('open');
-      h.querySelector('.q-chevron').textContent = '▼';
-    });
-    if (!wasOpen) {
-      header.classList.add('open');
-      header.querySelector('.q-chevron').textContent = '▲';
-    }
-  }
+  const qSections = [
+    { icon: "💥", title: "Current Pain & Performance", qs: [
+      "When your analytics team runs heavy queries, what happens to your application response times — and who feels it first?",
+      "Do you have SLAs on your transactional workload? How often do you breach them, and what's typically the cause?",
+      "Has a reporting job or batch process ever caused a production incident? What was the business impact?",
+      "Are there workloads you're not running today because you're worried they'd impact production?"
+    ]},
+    { icon: "🔧", title: "Data Pipeline Complexity", qs: [
+      "How are you currently getting operational data to your BI or reporting tools? Walk me through that pipeline.",
+      "How fresh is the data your analysts are working with — and has data staleness ever caused a bad business decision?",
+      "What's the engineering cost to build and maintain your ETL or replication pipelines today — in time and people?",
+      "How many separate databases are you managing to serve different teams — and what's the cost of keeping them in sync?"
+    ]},
+    { icon: "🏢", title: "Organizational & Team Friction", qs: [
+      "Who owns your analytics infrastructure vs. your app database? Do those teams compete for resources or prioritization?",
+      "When a business stakeholder asks 'why is the app slow right now' — how do you diagnose and explain what's happening?",
+      "Are your developers having to learn and maintain multiple query languages or SDKs to serve different workload types?"
+    ]},
+    { icon: "🚀", title: "Future State & Strategic Direction", qs: [
+      "As your data volumes grow, how are you thinking about scaling your analytics independently from your transactional layer?",
+      "If your analysts could query live operational data with zero risk to production, how would that change what they're able to build?",
+      "Are you considering a data warehouse or lakehouse? Is that driven by a capability gap, or isolation concerns you're trying to solve?",
+      "If you could collapse three separate infrastructure stacks into one platform with guaranteed workload isolation — what would that be worth in the next 12 months?"
+    ]}
+  ];
 
-  // Copy question
-  function copyQ(btn) {
-    const text = btn.parentElement.querySelector('.q-text').textContent;
-    navigator.clipboard.writeText(text).then(() => {
-      btn.textContent = 'copied!';
-      btn.classList.add('copied');
-      const tt = document.getElementById('tooltip');
-      tt.classList.add('show');
-      setTimeout(() => {
-        tt.classList.remove('show');
-        btn.textContent = 'copy';
-        btn.classList.remove('copied');
-      }, 1500);
-    });
-  }
-
-  document.addEventListener('mousemove', (e) => {
-    const tt = document.getElementById('tooltip');
-    tt.style.left = (e.clientX + 12) + 'px';
-    tt.style.top = (e.clientY - 8) + 'px';
+  const barStyle = (w, color) => ({ ...styles.barFill, width: `${w}%`, background: color });
+  const wCardStyle = (isStressed, isActive) => ({
+    ...styles.wCard,
+    borderColor: isStressed ? "#FF6B6B" : isActive ? "#FFB347" : cardBorder,
+    boxShadow: isStressed ? "0 0 12px rgba(255,107,107,0.3)" : "none"
   });
+
+  return (
+    <div style={styles.page}>
+      {tooltip.show && <div style={{ ...styles.tooltip, left: tooltip.x, top: tooltip.y }}>Copied!</div>}
+      <style>{`
+        @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.7)} }
+        @keyframes shimmer { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
+        a { color: ${muted}; text-decoration: none; }
+        a:hover { color: ${green}; }
+      `}</style>
+
+      {/* NAV */}
+      <nav style={styles.nav}>
+        <div style={styles.navBrand}>
+          <span style={styles.leaf} dangerouslySetInnerHTML={{__html: `<svg width="22" height="22" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M128.0 13.0 C128.0 13.0 61.0 88.5 61.0 152.0 C61.0 188.0 91.5 217.0 128.0 217.0 C164.5 217.0 195.0 188.0 195.0 152.0 C195.0 88.5 128.0 13.0 128.0 13.0 Z" fill="#00ED64"/><rect x="122" y="210" width="12" height="40" rx="6" fill="#00ED64"/></svg>`}} />
+          <span style={styles.navTitle}>MongoDB Atlas</span>
+        </div>
+        <div style={styles.navLinks}>
+          <a href="./index.html" style={styles.navLink}>← All Concepts</a>
+          <a href="./sharding.html" style={styles.navLink}>Sharding</a>
+        </div>
+      </nav>
+
+      {/* HERO */}
+      <div style={styles.hero}>
+        <div style={styles.heroEyebrow}>
+          <span style={styles.heroDot}></span>
+          Solutions Architecture
+        </div>
+        <h1 style={styles.heroH1}>
+          Workload <span style={styles.heroGreen}>Isolation</span>
+        </h1>
+        <p style={styles.heroSub}>
+          Run every workload at full speed — without sacrificing stability, freshness, or developer sanity.
+        </p>
+      </div>
+
+      {/* TABS */}
+      <div style={styles.tabRow}>
+        {tabs.map((t, i) => (
+          <button key={i} style={{ ...styles.tab, ...(activeTab === i ? styles.tabActive : {}) }} onClick={() => setActiveTab(i)}>{t}</button>
+        ))}
+      </div>
+
+      <div style={styles.body}>
+
+        {/* TAB 0: PROBLEM */}
+        {activeTab === 0 && (
+          <div>
+            <div style={styles.sectionTitle}>Without Isolation — One Database, Competing Workloads</div>
+            <p style={styles.sectionSub}>A single heavy analytics query can destabilize your entire production cluster. Click below to simulate.</p>
+
+            <div style={styles.simBox}>
+              <div style={styles.simLabel}>// shared resource pool</div>
+              {[["CPU", cpu, cpuColor], ["Memory", mem, memColor], ["I/O", io, ioColor]].map(([label, val, color]) => (
+                <div key={label} style={styles.barWrap}>
+                  <div style={styles.barRow}><span>{label}</span><span>{val}%</span></div>
+                  <div style={styles.barTrack}><div style={barStyle(val, color)}></div></div>
+                </div>
+              ))}
+              <div style={styles.wCards}>
+                <div style={wCardStyle(stressed, false)}>
+                  <div style={styles.wCardIcon}>⚡</div>
+                  <div style={styles.wCardName}>App Transactions</div>
+                  <div style={styles.wCardStat}>OLTP — high frequency</div>
+                  <div style={{ ...styles.wCardLatency, color: appLatencyColor }}>{appLatency}</div>
+                </div>
+                <div style={wCardStyle(stressed, false)}>
+                  <div style={styles.wCardIcon}>📊</div>
+                  <div style={styles.wCardName}>Reporting / BI</div>
+                  <div style={styles.wCardStat}>Long-running reads</div>
+                  <div style={{ ...styles.wCardLatency, color: reportColor }}>{reportStatus}</div>
+                </div>
+                <div style={wCardStyle(false, simRunning)}>
+                  <div style={styles.wCardIcon}>🔍</div>
+                  <div style={styles.wCardName}>Analytics Query</div>
+                  <div style={styles.wCardStat}>Full collection scan</div>
+                  <div style={{ ...styles.wCardLatency, color: analyticsColor }}>{analyticsStatus}</div>
+                </div>
+              </div>
+              <button style={{ ...styles.simBtn, borderColor: simRunning ? "#FF6B6B" : cardBorder, color: simRunning ? "#FF6B6B" : text }} onClick={simulate}>
+                {simRunning ? "⚠ Analytics query running — watch OLTP latency spike..." : "▶ Run Analytics Query — Watch What Happens"}
+              </button>
+            </div>
+
+            <div style={styles.calloutRow}>
+              {[["10×", "Latency spike on OLTP transactions when a single unoptimized analytics query hits the same cluster"],
+                ["3+", "Separate data stores teams are forced to maintain just to protect production performance"],
+                ["24h", "Average data lag analysts experience when working from warehouse exports instead of live data"]
+              ].map(([num, desc]) => (
+                <div key={num} style={styles.callout}>
+                  <div style={styles.calloutNum}>{num}</div>
+                  <div style={styles.calloutText}>{desc}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 1: SOLUTION */}
+        {activeTab === 1 && (
+          <div>
+            <div style={styles.sectionTitle}>Atlas Workload Isolation Capabilities</div>
+            <p style={styles.sectionSub}>Click each capability to explore how it works.</p>
+            <div style={styles.grid2}>
+              {solutions.map((s, i) => (
+                <div key={i} onClick={() => setSelectedSol(selectedSol === i ? null : i)}
+                  style={{ ...styles.infoCard, borderColor: selectedSol === i ? `${green}55` : cardBorder, cursor: "pointer", background: selectedSol === i ? "rgba(0,237,100,0.04)" : card }}>
+                  {selectedSol === i && <div style={styles.infoCardAccent}></div>}
+                  <div style={{ fontSize: 28, marginBottom: 12 }}>{s.icon}</div>
+                  <div style={styles.cardLabel}>{s.badge}</div>
+                  <div style={styles.cardTitle}>{s.name}</div>
+                  <p style={styles.cardBody}>{s.desc}</p>
+                  {selectedSol === i && (
+                    <div style={{ marginTop: 18, paddingTop: 18, borderTop: `1px solid ${cardBorder}` }}>
+                      {s.details.map((d, j) => (
+                        <div key={j} style={{ display: "flex", gap: 8, fontSize: 13, color: text, marginBottom: 8, lineHeight: 1.6, fontStyle: "italic" }}>
+                          <span style={{ color: green, flexShrink: 0 }}>→</span>{d}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div style={styles.archBox}>
+              <div style={styles.archLabel}>// typical isolated architecture</div>
+              <div style={styles.archSource}>App Traffic · BI Tools · Search · Batch Jobs · Analysts</div>
+              <div style={{ textAlign: "center", color: muted, fontSize: 18, margin: "12px 0", fontStyle: "italic" }}>↓ routed by workload type</div>
+              <div style={styles.archNodes}>
+                {[["Primary", "OLTP Writes + Reads", green], ["Analytics Node", "BI / Reporting", "#4DB8FF"], ["Search Node", "Full-Text / Vector", "#FFB347"], ["Online Archive", "Historical Data", muted]].map(([label, name, color]) => (
+                  <div key={label} style={{ ...styles.archNode, borderColor: color }}>
+                    <div style={{ ...styles.archNodeLabel, color }}>{label}</div>
+                    <div style={styles.archNodeName}>{name}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 2: VALUE */}
+        {activeTab === 2 && (
+          <div>
+            <div style={styles.sectionTitle}>The Business Value</div>
+            <p style={styles.sectionSub}>Workload isolation eliminates the tradeoffs that force teams to build and maintain multiple data systems.</p>
+            <div style={styles.grid3}>
+              {[["0", "ETL Pipelines to Maintain", "Analytics runs on live replica data. No extraction, no transformation, no nightly sync jobs to break."],
+                ["<1s", "Analytics Data Lag", "Replication to analytics nodes is near-real-time, vs. 24+ hours from a nightly warehouse export."],
+                ["100%", "SLA Protection", "App transactions are never impacted by analytics queries — they run on dedicated resources."],
+                ["1", "Platform to Operate", "Replace MongoDB + Elasticsearch + Redshift + S3 ETL with a single Atlas configuration."],
+                ["↓60%", "Infrastructure Cost", "Right-size each tier independently. Don't over-provision OLTP to handle batch analytics spikes."],
+                ["1 API", "One Model, All Workloads", "Developers use the same MQL driver, same document schema across every workload type."]
+              ].map(([num, label, desc]) => (
+                <div key={label} style={styles.infoCard}>
+                  <div style={styles.metricNum}>{num}</div>
+                  <div style={styles.metricLabel}>{label}</div>
+                  <p style={styles.cardBody}>{desc}</p>
+                </div>
+              ))}
+            </div>
+
+            <div style={styles.beforeAfter}>
+              <div>
+                <div style={{ ...styles.baHead, color: "#FF6B6B", borderBottomColor: "rgba(255,107,107,0.3)" }}>❌ Before Atlas Workload Isolation</div>
+                {["Analytics queries crash production during peak hours", "Nightly ETL to warehouse — analysts work with day-old data", "Separate Elasticsearch cluster to sync and maintain", "Over-provisioned primary cluster to absorb all workloads", "Three teams, three platforms, three data copies", "SLA violations when scheduled reports run"].map(t => (
+                  <div key={t} style={styles.baItem}><span>🔴</span>{t}</div>
+                ))}
+              </div>
+              <div>
+                <div style={{ ...styles.baHead, color: green, borderBottomColor: "rgba(0,237,100,0.3)" }}>✅ After Atlas Workload Isolation</div>
+                {["Analytics nodes absorb all heavy reads — OLTP unaffected", "Analysts query live data with sub-second replication lag", "Atlas Search nodes replace Elasticsearch entirely", "Each tier sized and billed independently", "One Atlas cluster, one driver, one data model", "Guaranteed SLA with resource isolation by design"].map(t => (
+                  <div key={t} style={styles.baItem}><span>🟢</span>{t}</div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: DISCOVERY */}
+        {activeTab === 3 && (
+          <div>
+            <div style={styles.sectionTitle}>Discovery Questions</div>
+            <div style={{ ...styles.infoCard, borderLeft: `3px solid ${green}`, borderRadius: "0 6px 6px 0", marginBottom: 28 }}>
+              <p style={{ ...styles.cardBody, color: muted }}>Use these questions to uncover pain, quantify impact, and build urgency. Hover any question and click <strong>copy</strong> to grab it for your call notes.</p>
+            </div>
+            {qSections.map((sec, i) => (
+              <div key={i} style={styles.qAccordion}>
+                <div style={{ ...styles.qHeader, ...(openQ === i ? styles.qHeaderOpen : {}) }} onClick={() => setOpenQ(openQ === i ? -1 : i)}>
+                  <span style={styles.qHeaderIcon}>{sec.icon}</span>
+                  <span style={styles.qHeaderTitle}>{sec.title}</span>
+                  <span style={styles.qHeaderCount}>{sec.qs.length} questions</span>
+                  <span style={{ color: muted, fontSize: 12 }}>{openQ === i ? "▲" : "▼"}</span>
+                </div>
+                {openQ === i && (
+                  <div style={styles.qList}>
+                    {sec.qs.map((q, j) => (
+                      <div key={j} style={styles.qItem} onMouseEnter={e => e.currentTarget.style.background = "rgba(0,237,100,0.05)"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                        <span style={styles.qBullet}></span>
+                        <span style={styles.qText}>"{q}"</span>
+                        <button style={styles.qCopy} onClick={() => copyQ(q)}>copy</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+      </div>
+
+      {/* FOOTER */}
+      <div style={styles.footer}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ opacity: 0.5, display: "flex", alignItems: "center" }} dangerouslySetInnerHTML={{__html: `<svg width="16" height="16" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M128.0 13.0 C128.0 13.0 61.0 88.5 61.0 152.0 C61.0 188.0 91.5 217.0 128.0 217.0 C164.5 217.0 195.0 188.0 195.0 152.0 C195.0 88.5 128.0 13.0 128.0 13.0 Z" fill="#00ED64"/><rect x="122" y="210" width="12" height="40" rx="6" fill="#00ED64"/></svg>`}} />
+          <span style={styles.footerText}>MongoDB Atlas — Workload Isolation</span>
+        </div>
+        <span style={styles.footerText}>Solutions Architecture</span>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.render(<App />, document.getElementById("root"));
 </script>
 </body>
 </html>
