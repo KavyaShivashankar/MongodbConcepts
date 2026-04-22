@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MongoDB Concepts - Solutions Architecture</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root { --green: #00ED64; --black: #001E2B; --surface: #112733; --border: #1a3a4a; --text: #E8F4F1; --muted: #7B9EA8; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--black); color: var(--text); font-family: 'DM Mono', monospace; min-height: 100vh; overflow-x: hidden; }
+  body::before { content: ''; position: fixed; inset: 0; background-image: linear-gradient(rgba(0,237,100,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,237,100,0.03) 1px, transparent 1px); background-size: 48px 48px; pointer-events: none; z-index: 0; animation: gridDrift 20s linear infinite; }
+  @keyframes gridDrift { 0% { background-position: 0 0; } 100% { background-position: 48px 48px; } }
+  body::after { content: ''; position: fixed; width: 600px; height: 600px; background: radial-gradient(circle, rgba(0,237,100,0.06) 0%, transparent 70%); top: -100px; right: -100px; pointer-events: none; z-index: 0; border-radius: 50%; }
+  .container { max-width: 960px; margin: 0 auto; padding: 0 32px; position: relative; z-index: 1; }
+  header { padding: 40px 0 0; display: flex; align-items: center; gap: 12px; }
+  .leaf { width: 28px; height: 28px; background: var(--green); border-radius: 0 50% 0 50%; transform: rotate(-45deg); flex-shrink: 0; }
+  .brand { font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--green); }
+  .hero { padding: 80px 0 64px; }
+  .eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-bottom: 24px; }
+  .eyebrow-dot { width: 6px; height: 6px; background: var(--green); border-radius: 50%; animation: pulse 2s ease infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.7); } }
+  h1 { font-family: 'Syne', sans-serif; font-size: clamp(48px, 7vw, 88px); font-weight: 800; line-height: 0.95; letter-spacing: -0.03em; margin-bottom: 28px; }
+  h1 .line1 { display: block; color: var(--text); }
+  h1 .line2 { display: block; color: var(--green); }
+  .hero-desc { font-size: 14px; color: var(--muted); max-width: 480px; line-height: 1.8; border-left: 2px solid var(--border); padding-left: 16px; }
+  .divider { height: 1px; background: linear-gradient(90deg, var(--green) 0%, transparent 60%); margin-bottom: 48px; opacity: 0.3; }
+  .section-label { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-bottom: 20px; }
+  .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; background: var(--border); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .card { background: var(--surface); padding: 40px; text-decoration: none; color: inherit; display: block; position: relative; overflow: hidden; transition: background 0.2s; }
+  .card::before { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(0,237,100,0.05) 0%, transparent 60%); opacity: 0; transition: opacity 0.3s; }
+  .card:hover { background: #0e2430; }
+  .card:hover::before { opacity: 1; }
+  .card::after { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--green); transform: scaleX(0); transform-origin: left; transition: transform 0.35s ease; }
+  .card:hover::after { transform: scaleX(1); }
+  .card-number { font-size: 11px; color: var(--muted); letter-spacing: 0.15em; margin-bottom: 24px; display: flex; align-items: center; gap: 8px; }
+  .card-number::before { content: ''; display: inline-block; width: 24px; height: 1px; background: var(--muted); }
+  .card-icon { font-size: 36px; margin-bottom: 20px; display: block; transition: transform 0.3s ease; }
+  .card:hover .card-icon { transform: scale(1.1) rotate(-3deg); }
+  .card-title { font-family: 'Syne', sans-serif; font-size: 26px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 10px; line-height: 1.1; }
+  .card-subtitle { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--green); margin-bottom: 16px; }
+  .card-desc { font-size: 12px; color: var(--muted); line-height: 1.8; margin-bottom: 32px; }
+  .card-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 32px; }
+  .tag { padding: 4px 10px; border: 1px solid var(--border); font-size: 10px; letter-spacing: 0.08em; color: var(--muted); border-radius: 2px; transition: all 0.2s; }
+  .card:hover .tag { border-color: rgba(0,237,100,0.2); color: rgba(0,237,100,0.7); }
+  .card-cta { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--green); letter-spacing: 0.08em; text-transform: uppercase; font-weight: 500; transition: gap 0.2s; }
+  .card:hover .card-cta { gap: 14px; }
+  .cta-arrow { font-size: 16px; transition: transform 0.2s; }
+  .card:hover .cta-arrow { transform: translateX(4px); }
+  footer { padding: 48px 0 40px; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border); margin-top: 64px; }
+  .footer-left { display: flex; align-items: center; gap: 10px; }
+  .footer-leaf { width: 18px; height: 18px; background: var(--green); border-radius: 0 50% 0 50%; transform: rotate(-45deg); opacity: 0.5; }
+  .footer-text { font-size: 11px; color: var(--muted); letter-spacing: 0.08em; }
+  .footer-right { font-size: 11px; color: var(--border); letter-spacing: 0.05em; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+  @media (max-width: 640px) { .cards { grid-template-columns: 1fr; } h1 { font-size: 52px; } .card { padding: 28px; } }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="leaf"></div>
+    <span class="brand">MongoDB Atlas - Solutions Architecture</span>
+  </header>
+  <section class="hero">
+    <div class="eyebrow"><span class="eyebrow-dot"></span>Interactive explainers</div>
+    <h1><span class="line1">MongoDB</span><span class="line2">Concepts</span></h1>
+    <p class="hero-desc">Hands-on, interactive guides for customer conversations. Built for solutions architects.</p>
+  </section>
+  <div class="divider"></div>
+  <div class="section-label">// available guides</div>
+  <div class="cards">
+    <a class="card" href="./sharding.html">
+      <div class="card-number">01</div>
+      <span class="card-icon">&#x26A1;</span>
+      <div class="card-subtitle">Scalability</div>
+      <div class="card-title">Sharding</div>
+      <p class="card-desc">How MongoDB distributes data horizontally across shards and why it matters for scale-out architectures.</p>
+      <div class="card-tags"><span class="tag">Horizontal Scale</span><span class="tag">Data Distribution</span><span class="tag">Shard Keys</span><span class="tag">Zone Sharding</span></div>
+      <div class="card-cta">Open guide <span class="cta-arrow">&#x2192;</span></div>
+    </a>
+    <a class="card" href="./workload-isolation.html">
+      <div class="card-number">02</div>
+      <span class="card-icon">&#x1F535;</span>
+      <div class="card-subtitle">Performance</div>
+      <div class="card-title">Workload Isolation</div>
+      <p class="card-desc">Run OLTP, analytics, search, and reporting simultaneously without any workload degrading another.</p>
+      <div class="card-tags"><span class="tag">Analytics Nodes</span><span class="tag">Atlas Search</span><span class="tag">Online Archive</span><span class="tag">SLA Protection</span></div>
+      <div class="card-cta">Open guide <span class="cta-arrow">&#x2192;</span></div>
+    </a>
+  </div>
+  <footer>
+    <div class="footer-left"><div class="footer-leaf"></div><span class="footer-text">MongoDB Atlas - Solutions Architecture</span></div>
+    <span class="footer-right">kavyashivashankar.github.io/mongodbconcepts</span>
+  </footer>
+</div>
+</body>
+</html>
