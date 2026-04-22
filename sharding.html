@@ -7,26 +7,222 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
-<style>*{box-sizing:border-box;margin:0;padding:0}body{background:#0A1628;font-family:Georgia,serif;color:#E8F4FF}</style>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0A1628; font-family: Georgia, serif; color: #E8F4FF; }
+</style>
 </head>
 <body>
 <div id="root"></div>
-
-<!-- SA INTERNAL NOTES (not rendered) -->
-<!-- DISCOVERY QUESTIONS:
-  Q1: What's your current data volume and 12-month growth forecast?
-  Q2: Where are you hitting performance ceilings today?
-  Q3: Do you have compliance requirements around data locality?
-  Q4: How much of your budget goes to vertical scaling today?
--->
-
 <script type="text/babel">
-const green="#00ED64",bg="#0A1628",card="#0F1F3D",cb="#1A3560",txt="#E8F4FF",mu="#7A9CC0";
-const secs=[{id:"problem",label:"The Problem",icon:"⚠️",headline:"When a single server isn't enough",body:"As your application grows, a single MongoDB node hits hard limits — storage fills up, memory gets exhausted, and write throughput becomes a bottleneck. You're faced with a choice: keep scaling vertically (bigger, more expensive hardware) or distribute the load intelligently across many machines.",callout:"Vertical scaling is expensive and has a ceiling. Horizontal scaling is elastic and cost-effective.",visual:"single-node"},{id:"what",label:"What is Sharding?",icon:"🔀",headline:"Horizontal partitioning across a cluster",body:"Sharding distributes your data across multiple servers called shards. Each shard holds a subset of the dataset. MongoDB uses a shard key — a field or set of fields — to determine how documents are partitioned. The cluster routes queries automatically, so your application code doesn't change.",callout:"Your application talks to one cluster. MongoDB handles the rest — transparently.",visual:"diagram"},{id:"components",label:"Architecture",icon:"🏗️",headline:"Three components working together",body:null,callout:null,visual:"components"},{id:"key",label:"Shard Key",icon:"🔑",headline:"The shard key is the most important decision",body:"The shard key determines how data is distributed. A good shard key ensures even distribution, avoids hot spots, and aligns with your query patterns. MongoDB supports ranged, hashed, and zone sharding.",callout:null,visual:"shardkey",strategies:[{name:"Hashed",desc:"Even distribution. Best for write-heavy workloads.",icon:"#"},{name:"Ranged",desc:"Sequential ranges per shard. Best for range queries.",icon:"↔"},{name:"Zone",desc:"Pin data to shards by region or tier.",icon:"📍"}]},{id:"value",label:"Business Value",icon:"📈",headline:"Why customers invest in sharding",body:null,callout:null,visual:"value",values:[{title:"Unlimited Scale",desc:"Add shards as data grows. No ceiling on storage or throughput.",icon:"∞"},{title:"High Throughput",desc:"Reads and writes distributed — linear performance gains.",icon:"⚡"},{title:"Operational Continuity",desc:"Each shard is a replica set. Failures stay isolated.",icon:"🛡️"},{title:"Cost Efficiency",desc:"Commodity hardware instead of expensive enterprise iron.",icon:"💰"},{title:"Geo-Distribution",desc:"Zone sharding places data close to users for compliance.",icon:"🌍"},{title:"Transparent to App",desc:"No query rewrites. mongos routes automatically.",icon:"🔌"}]}];
-const CC=({title,desc,color})=><div style={{background:card,border:"1px solid "+color+"44",borderTop:"3px solid "+color,borderRadius:8,padding:16,flex:1,minWidth:160}}><div style={{color,fontWeight:700,fontSize:13,letterSpacing:1,marginBottom:6,fontFamily:"monospace"}}>{title}</div><div style={{color:mu,fontSize:13,lineHeight:1.6}}>{desc}</div></div>;
-const Diag=()=><div style={{textAlign:"center",padding:"8px 0"}}><div style={{display:"inline-block",background:"#1A3560",border:"1px solid "+green,borderRadius:8,padding:"8px 32px",color:green,fontWeight:700,fontSize:13,fontFamily:"monospace",marginBottom:4}}>Your Application</div><div style={{color:mu,fontSize:20}}>↓</div><div style={{display:"inline-block",background:"#1A3560",border:"1px solid #FFB300",borderRadius:8,padding:"8px 32px",color:"#FFB300",fontWeight:700,fontSize:13,fontFamily:"monospace",marginBottom:4}}>mongos (Query Router)</div><div style={{color:mu,fontSize:20}}>↓</div><div style={{display:"inline-block",background:"#1A3560",border:"1px solid #7C4DFF",borderRadius:8,padding:"8px 24px",color:"#B39DDB",fontWeight:700,fontSize:13,fontFamily:"monospace",marginBottom:12}}>Config Servers (Cluster Metadata)</div><div style={{display:"flex",justifyContent:"center",gap:8}}>{["Shard 1","Shard 2","Shard 3"].map((s,i)=><div key={i} style={{background:"#0A2040",border:"1px solid "+green+"66",borderRadius:8,padding:"10px 18px",fontSize:12,fontFamily:"monospace",textAlign:"center",width:90}}><div style={{color:green,fontWeight:700,marginBottom:4}}>{s}</div><div style={{color:mu,fontSize:11}}>Replica Set</div><div style={{display:"flex",gap:3,marginTop:6,justifyContent:"center"}}>{["P","S","S"].map((n,j)=><div key={j} style={{width:20,height:20,borderRadius:4,background:j===0?green+"33":"#1A3560",color:j===0?green:mu,fontSize:9,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700}}>{n}</div>)}</div></div>)}</div><div style={{color:mu,fontSize:11,marginTop:8}}>P = Primary · S = Secondary</div></div>;
-function App(){const[active,setActive]=React.useState("problem");const sec=secs.find(s=>s.id===active);return <div style={{background:bg,minHeight:"100vh",color:txt,fontFamily:"Georgia,serif",padding:"32px 16px",display:"flex",flexDirection:"column",alignItems:"center"}}><div style={{maxWidth:720,width:"100%",marginBottom:32}}><div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8}}><div style={{width:40,height:40,borderRadius:8,background:green+"22",display:"flex",alignItems:"center",justifyContent:"center"}}><svg width="22" height="22" viewBox="0 0 40 40" fill="none"><path d="M20 2C20 2 28 14 28 22C28 26.4 24.4 30 20 30C15.6 30 12 26.4 12 22C12 14 20 2 20 2Z" fill={green}/><path d="M20 30L20 38" stroke={green} strokeWidth="2.5" strokeLinecap="round"/></svg></div><div><div style={{fontSize:11,color:green,fontFamily:"monospace",letterSpacing:2,marginBottom:2}}>MONGODB SOLUTIONS</div><h1 style={{margin:0,fontSize:24,fontWeight:700,fontFamily:"monospace"}}>Sharding Explained</h1></div></div><p style={{color:mu,fontSize:14,lineHeight:1.7}}>A customer-facing walkthrough of MongoDB's horizontal scaling strategy — what it is, how it works, and why it matters.</p></div><div style={{maxWidth:720,width:"100%",display:"flex",flexWrap:"wrap",gap:8,marginBottom:24}}>{secs.map(s=><button key={s.id} onClick={()=>setActive(s.id)} style={{background:active===s.id?green+"22":"transparent",border:"1px solid "+(active===s.id?green:cb),borderRadius:6,padding:"6px 14px",color:active===s.id?green:mu,fontSize:12,fontFamily:"monospace",cursor:"pointer",fontWeight:active===s.id?700:400}}>{s.icon} {s.label}</button>)}</div><div style={{maxWidth:720,width:"100%",background:card,border:"1px solid "+cb,borderRadius:12,padding:28,minHeight:340}}><h2 style={{margin:"0 0 16px",fontSize:20,fontWeight:700}}>{sec.headline}</h2>{sec.body&&<p style={{color:mu,fontSize:14,lineHeight:1.8,margin:"0 0 20px"}}>{sec.body}</p>}{sec.visual==="diagram"&&<Diag/>}{sec.visual==="components"&&<div style={{display:"flex",gap:12,flexWrap:"wrap"}}><CC title="mongos (Router)" desc="Routes all client requests to the correct shard. Invisible to your app." color="#FFB300"/><CC title="Config Servers" desc="Store cluster metadata: which chunks live where. 3-node replica set." color="#7C4DFF"/><CC title="Shards" desc="Each shard is a replica set holding a slice of your data." color={green}/></div>}{sec.visual==="shardkey"&&sec.strategies&&<div style={{display:"flex",gap:10,flexWrap:"wrap"}}>{sec.strategies.map((s,i)=><div key={i} style={{flex:1,minWidth:140,background:"#0A2040",border:"1px solid "+cb,borderRadius:8,padding:14}}><div style={{width:32,height:32,borderRadius:6,background:green+"22",color:green,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,fontSize:16,marginBottom:8}}>{s.icon}</div><div style={{fontWeight:700,fontSize:13,marginBottom:4}}>{s.name} Sharding</div><div style={{color:mu,fontSize:12,lineHeight:1.6}}>{s.desc}</div></div>)}</div>}{sec.visual==="value"&&sec.values&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:12}}>{sec.values.map((v,i)=><div key={i} style={{background:"#0A2040",border:"1px solid "+cb,borderRadius:8,padding:14}}><div style={{fontSize:20,marginBottom:6}}>{v.icon}</div><div style={{color:green,fontWeight:700,fontSize:13,marginBottom:4}}>{v.title}</div><div style={{color:mu,fontSize:12,lineHeight:1.6}}>{v.desc}</div></div>)}</div>}{sec.visual==="single-node"&&<div style={{display:"flex",gap:16,alignItems:"center",flexWrap:"wrap"}}><div style={{flex:1,minWidth:140,background:"#0A2040",border:"1px solid #FF5252aa",borderRadius:8,padding:16,textAlign:"center"}}><div style={{color:"#FF5252",fontFamily:"monospace",fontWeight:700,marginBottom:8}}>Single Node</div><div style={{color:mu,fontSize:12,lineHeight:1.7}}>Storage: <span style={{color:"#FF5252"}}>FULL</span><br/>RAM: <span style={{color:"#FF5252"}}>EXHAUSTED</span><br/>Write TPS: <span style={{color:"#FF5252"}}>BOTTLENECK</span></div></div><div style={{fontSize:24}}>→</div><div style={{flex:1,minWidth:140,background:"#0A2040",border:"1px solid "+green+"88",borderRadius:8,padding:16,textAlign:"center"}}><div style={{color:green,fontFamily:"monospace",fontWeight:700,marginBottom:8}}>Sharded Cluster</div><div style={{color:mu,fontSize:12,lineHeight:1.7}}>Storage: <span style={{color:green}}>ELASTIC</span><br/>RAM: <span style={{color:green}}>DISTRIBUTED</span><br/>Write TPS: <span style={{color:green}}>LINEAR SCALE</span></div></div></div>}{sec.callout&&<div style={{marginTop:20,background:green+"11",border:"1px solid "+green+"44",borderLeft:"3px solid "+green,borderRadius:6,padding:"12px 16px",color:green,fontSize:13,lineHeight:1.6}}>💡 {sec.callout}</div>}</div><div style={{maxWidth:720,width:"100%",marginTop:32,paddingTop:16,borderTop:"1px solid "+cb,color:mu,fontSize:11,fontFamily:"monospace",textAlign:"center"}}>KavyaShivashankar · MongoDB Solutions Architecture · Built with Claude</div></div>;}
-ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+const green = "#00ED64";
+const bg = "#0A1628";
+const card = "#0F1F3D";
+const cardBorder = "#1A3560";
+const text = "#E8F4FF";
+const muted = "#7A9CC0";
+
+const sections = [
+  {
+    id: "problem",
+    label: "The Problem",
+    icon: "⚠️",
+    headline: "When a single server isn't enough",
+    body: `As your application grows, a single MongoDB node hits hard limits — storage fills up, memory gets exhausted, and write throughput becomes a bottleneck. You're faced with a choice: keep scaling vertically (bigger, more expensive hardware) or distribute the load intelligently across many machines.`,
+    callout: "Vertical scaling is expensive and has a ceiling. Horizontal scaling is elastic and cost-effective.",
+    visual: "single-node",
+  },
+  {
+    id: "what",
+    label: "What is Sharding?",
+    icon: "🔀",
+    headline: "Horizontal partitioning across a cluster",
+    body: `Sharding distributes your data across multiple servers called shards. Each shard holds a subset of the dataset. MongoDB uses a shard key — a field or set of fields — to determine how documents are partitioned. The cluster routes queries automatically, so your application code doesn't change.`,
+    callout: "Your application talks to one cluster. MongoDB handles the rest — transparently.",
+    visual: "sharding-diagram",
+  },
+  {
+    id: "components",
+    label: "Architecture",
+    icon: "🏗️",
+    headline: "Three components working together",
+    body: null,
+    callout: null,
+    visual: "components",
+  },
+  {
+    id: "shard-key",
+    label: "Shard Key",
+    icon: "🔑",
+    headline: "The shard key is the most important decision",
+    body: `The shard key determines how data is distributed. A good shard key ensures even distribution, avoids hot spots, and aligns with your query patterns. MongoDB supports ranged sharding, hashed sharding, and zone sharding for geo-locality.`,
+    callout: null,
+    visual: "shard-key",
+    strategies: [
+      { name: "Hashed", desc: "Even distribution across shards. Best for write-heavy workloads.", icon: "#" },
+      { name: "Ranged", desc: "Sequential ranges per shard. Best for range queries.", icon: "↔" },
+      { name: "Zone", desc: "Pin data to specific shards by region or tier.", icon: "📍" },
+    ],
+  },
+  {
+    id: "value",
+    label: "Business Value",
+    icon: "📈",
+    headline: "Why customers invest in sharding",
+    body: null,
+    callout: null,
+    visual: "value",
+    values: [
+      { title: "Unlimited Scale", desc: "Add shards as data grows. No hard ceiling on storage or throughput.", icon: "∞" },
+      { title: "High Throughput", desc: "Reads and writes distributed across shards — linear performance gains.", icon: "⚡" },
+      { title: "Operational Continuity", desc: "Each shard is a replica set. Hardware failure doesn't take down the cluster.", icon: "🛡️" },
+      { title: "Cost Efficiency", desc: "Commodity hardware instead of bespoke enterprise iron.", icon: "💰" },
+      { title: "Geo-Distribution", desc: "Zone sharding places data close to users for compliance and latency.", icon: "🌍" },
+      { title: "Transparent to App", desc: "No query rewrites. mongos handles routing automatically.", icon: "🔌" },
+    ],
+  },
+];
+
+const ComponentCard = ({ title, desc, color }) => (
+  <div style={{background:card,border:`1px solid ${color}44`,borderTop:`3px solid ${color}`,borderRadius:8,padding:"16px",flex:1,minWidth:160}}>
+    <div style={{color,fontWeight:700,fontSize:13,letterSpacing:1,marginBottom:6,fontFamily:"monospace"}}>{title}</div>
+    <div style={{color:muted,fontSize:13,lineHeight:1.6}}>{desc}</div>
+  </div>
+);
+
+const ShardingDiagram = () => (
+  <div style={{textAlign:"center",padding:"8px 0"}}>
+    <div style={{display:"inline-block",background:"#1A3560",border:`1px solid ${green}`,borderRadius:8,padding:"8px 32px",color:green,fontWeight:700,fontSize:13,fontFamily:"monospace",marginBottom:4}}>Your Application</div>
+    <div style={{color:muted,fontSize:20,lineHeight:"24px"}}>↓</div>
+    <div style={{display:"inline-block",background:"#1A3560",border:"1px solid #FFB300",borderRadius:8,padding:"8px 32px",color:"#FFB300",fontWeight:700,fontSize:13,fontFamily:"monospace",marginBottom:4}}>mongos (Query Router)</div>
+    <div style={{color:muted,fontSize:20,lineHeight:"24px"}}>↓</div>
+    <div style={{display:"inline-block",background:"#1A3560",border:"1px solid #7C4DFF",borderRadius:8,padding:"8px 24px",color:"#B39DDB",fontWeight:700,fontSize:13,fontFamily:"monospace",marginBottom:8}}>Config Servers (Cluster Metadata)</div>
+    <div style={{display:"flex",justifyContent:"center",gap:8,marginBottom:4}}>
+      {["Shard 1","Shard 2","Shard 3"].map((s,i)=>(
+        <div key={i} style={{background:"#0A2040",border:`1px solid ${green}66`,borderRadius:8,padding:"10px 18px",color:text,fontSize:12,fontFamily:"monospace",textAlign:"center",width:90}}>
+          <div style={{color:green,fontWeight:700,marginBottom:4}}>{s}</div>
+          <div style={{color:muted,fontSize:11}}>Replica Set</div>
+          <div style={{display:"flex",gap:3,marginTop:6,justifyContent:"center"}}>
+            {["P","S","S"].map((n,j)=>(
+              <div key={j} style={{width:20,height:20,borderRadius:4,background:j===0?`${green}33`:"#1A3560",color:j===0?green:muted,fontSize:9,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700}}>{n}</div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+    <div style={{color:muted,fontSize:11,marginTop:4}}>P = Primary · S = Secondary</div>
+  </div>
+);
+
+function App() {
+  const [active, setActive] = React.useState("problem");
+  const section = sections.find(s => s.id === active);
+
+  return (
+    <div style={{background:bg,minHeight:"100vh",color:text,fontFamily:"Georgia, serif",padding:"32px 16px",display:"flex",flexDirection:"column",alignItems:"center"}}>
+      <div style={{maxWidth:720,width:"100%",marginBottom:32}}>
+        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8}}>
+          <div style={{width:40,height:40,borderRadius:8,background:`${green}22`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <svg width="22" height="22" viewBox="0 0 40 40" fill="none">
+              <path d="M20 2 C20 2 28 14 28 22 C28 26.4 24.4 30 20 30 C15.6 30 12 26.4 12 22 C12 14 20 2 20 2Z" fill={green}/>
+              <path d="M20 30 L20 38" stroke={green} strokeWidth="2.5" strokeLinecap="round"/>
+            </svg>
+          </div>
+          <div>
+            <div style={{fontSize:11,color:green,fontFamily:"monospace",letterSpacing:2,marginBottom:2}}>MONGODB SOLUTIONS</div>
+            <h1 style={{margin:0,fontSize:24,fontWeight:700,color:text,fontFamily:"monospace"}}>Sharding Explained</h1>
+          </div>
+        </div>
+        <p style={{color:muted,fontSize:14,margin:0,lineHeight:1.7}}>A customer-facing walkthrough of MongoDB's horizontal scaling strategy — what it is, how it works, and why it matters for your business.</p>
+      </div>
+
+      <div style={{maxWidth:720,width:"100%",display:"flex",flexWrap:"wrap",gap:8,marginBottom:24}}>
+        {sections.map(s=>(
+          <button key={s.id} onClick={()=>setActive(s.id)} style={{background:active===s.id?`${green}22`:"transparent",border:`1px solid ${active===s.id?green:cardBorder}`,borderRadius:6,padding:"6px 14px",color:active===s.id?green:muted,fontSize:12,fontFamily:"monospace",cursor:"pointer",fontWeight:active===s.id?700:400}}>
+            {s.icon} {s.label}
+          </button>
+        ))}
+      </div>
+
+      <div style={{maxWidth:720,width:"100%",background:card,border:`1px solid ${cardBorder}`,borderRadius:12,padding:"28px",minHeight:340}}>
+        <h2 style={{margin:"0 0 16px",fontSize:20,fontWeight:700,color:text}}>{section.headline}</h2>
+        {section.body && <p style={{color:muted,fontSize:14,lineHeight:1.8,margin:"0 0 20px"}}>{section.body}</p>}
+
+        {section.visual==="sharding-diagram" && <ShardingDiagram />}
+
+        {section.visual==="components" && (
+          <div style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:16}}>
+            <ComponentCard title="mongos (Router)" desc="Receives all client requests and routes them to the correct shard(s). Invisible to your application — it just speaks MongoDB wire protocol." color="#FFB300"/>
+            <ComponentCard title="Config Servers" desc="Store the cluster's metadata: which chunks live on which shards. A 3-node replica set for high availability." color="#7C4DFF"/>
+            <ComponentCard title="Shards" desc="Each shard is itself a replica set holding a horizontal slice of your data. Add more shards to grow capacity." color={green}/>
+          </div>
+        )}
+
+        {section.visual==="shard-key" && section.strategies && (
+          <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+            {section.strategies.map((s,i)=>(
+              <div key={i} style={{flex:1,minWidth:140,background:"#0A2040",border:`1px solid ${cardBorder}`,borderRadius:8,padding:"14px"}}>
+                <div style={{width:32,height:32,borderRadius:6,background:`${green}22`,color:green,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,fontSize:16,marginBottom:8}}>{s.icon}</div>
+                <div style={{color:text,fontWeight:700,fontSize:13,marginBottom:4}}>{s.name} Sharding</div>
+                <div style={{color:muted,fontSize:12,lineHeight:1.6}}>{s.desc}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {section.visual==="value" && section.values && (
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(200px, 1fr))",gap:12}}>
+            {section.values.map((v,i)=>(
+              <div key={i} style={{background:"#0A2040",border:`1px solid ${cardBorder}`,borderRadius:8,padding:"14px"}}>
+                <div style={{fontSize:20,marginBottom:6}}>{v.icon}</div>
+                <div style={{color:green,fontWeight:700,fontSize:13,marginBottom:4}}>{v.title}</div>
+                <div style={{color:muted,fontSize:12,lineHeight:1.6}}>{v.desc}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {section.visual==="single-node" && (
+          <div style={{display:"flex",gap:16,alignItems:"flex-start",flexWrap:"wrap",marginBottom:8}}>
+            <div style={{flex:1,minWidth:140,background:"#0A2040",border:"1px solid #FF5252aa",borderRadius:8,padding:16,textAlign:"center"}}>
+              <div style={{color:"#FF5252",fontFamily:"monospace",fontWeight:700,marginBottom:8}}>Single Node</div>
+              <div style={{color:muted,fontSize:12,lineHeight:1.7}}>Storage: <span style={{color:"#FF5252"}}>FULL</span><br/>RAM: <span style={{color:"#FF5252"}}>EXHAUSTED</span><br/>Write TPS: <span style={{color:"#FF5252"}}>BOTTLENECK</span></div>
+            </div>
+            <div style={{color:text,fontSize:24,alignSelf:"center"}}>→</div>
+            <div style={{flex:1,minWidth:140,background:"#0A2040",border:`1px solid ${green}88`,borderRadius:8,padding:16,textAlign:"center"}}>
+              <div style={{color:green,fontFamily:"monospace",fontWeight:700,marginBottom:8}}>Sharded Cluster</div>
+              <div style={{color:muted,fontSize:12,lineHeight:1.7}}>Storage: <span style={{color:green}}>ELASTIC</span><br/>RAM: <span style={{color:green}}>DISTRIBUTED</span><br/>Write TPS: <span style={{color:green}}>LINEAR SCALE</span></div>
+            </div>
+          </div>
+        )}
+
+        {section.callout && (
+          <div style={{marginTop:20,background:`${green}11`,border:`1px solid ${green}44`,borderLeft:`3px solid ${green}`,borderRadius:6,padding:"12px 16px",color:green,fontSize:13,lineHeight:1.6}}>
+            💡 {section.callout}
+          </div>
+        )}
+      </div>
+
+      <div style={{maxWidth:720,width:"100%",marginTop:20}}>
+        <div style={{color:muted,fontSize:11,fontFamily:"monospace",letterSpacing:1,marginBottom:10}}>DISCOVERY QUESTIONS TO ASK YOUR CUSTOMER</div>
+        <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+          {["What's your current data volume and 12-month growth forecast?","Where are you hitting performance ceilings today?","Do you have compliance requirements around data locality?","How much of your budget goes to vertical scaling today?"].map((q,i)=>(
+            <div key={i} style={{background:card,border:`1px solid ${cardBorder}`,borderRadius:6,padding:"8px 14px",color:muted,fontSize:12,lineHeight:1.6,flex:"1 1 200px"}}>
+              <span style={{color:green,fontWeight:700}}>Q{i+1}:</span> {q}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{maxWidth:720,width:"100%",marginTop:32,paddingTop:16,borderTop:`1px solid ${cardBorder}`,color:muted,fontSize:11,fontFamily:"monospace",textAlign:"center"}}>
+        KavyaShivashankar · MongoDB Solutions Architecture · Built with Claude
+      </div>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
 </script>
 </body>
 </html>
