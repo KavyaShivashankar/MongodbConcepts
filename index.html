@@ -96,7 +96,7 @@ function App() {
         </div>
         <div style={{ height: 1, background: `linear-gradient(90deg, ${green} 0%, transparent 60%)`, opacity: 0.2, maxWidth: 860, margin: "0 auto 48px", padding: "0 40px" }}></div>
         <div style={{ maxWidth: 860, margin: "0 auto", padding: "0 40px 80px" }}>
-          <div style={{ fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: muted, marginBottom: 24, fontStyle: "italic" }}></div>
+          <div style={{ fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: muted, marginBottom: 24, fontStyle: "italic" }}>Available Guides</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             {concepts.map((c, i) => (
               <Card key={i} c={c} hovered={hovered === i} onEnter={() => setHovered(i)} onLeave={() => setHovered(null)} />
