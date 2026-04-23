@@ -19,6 +19,9 @@ const cardBorder = "#1A3560";
 const text = "#E8F4FF";
 const muted = "#7A9CC0";
 
+const mongoLeafSvg = '<svg width="22" height="22" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M128 13 C128 13 61 88.5 61 152 C61 188 91.5 217 128 217 C164.5 217 195 188 195 152 C195 88.5 128 13 128 13Z" fill="#00ED64"/><rect x="122" y="210" width="12" height="40" rx="6" fill="#00ED64"/></svg>';
+const mongoLeafSmall = '<svg width="16" height="16" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M128 13 C128 13 61 88.5 61 152 C61 188 91.5 217 128 217 C164.5 217 195 188 195 152 C195 88.5 128 13 128 13Z" fill="#00ED64"/><rect x="122" y="210" width="12" height="40" rx="6" fill="#00ED64"/></svg>';
+
 const concepts = [
   {
     num: "01", icon: "⚡", category: "Scalability", title: "Sharding",
@@ -77,7 +80,7 @@ function App() {
       <div style={{ position: "relative", zIndex: 1 }}>
         <nav style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 40px", borderBottom: `1px solid ${cardBorder}`, background: "rgba(10,22,40,0.95)", position: "sticky", top: 0, zIndex: 100 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 22, height: 22, background: green, borderRadius: "0 50% 0 50%", transform: "rotate(-45deg)" }}></div>
+            <span style={{ display: "flex", alignItems: "center" }} dangerouslySetInnerHTML={{ __html: mongoLeafSvg }} />
             <span style={{ color: green, fontFamily: "Georgia, serif", fontSize: 14, fontStyle: "italic", letterSpacing: "0.05em" }}>MongoDB Atlas</span>
           </div>
           <span style={{ fontSize: 12, color: muted, fontStyle: "italic", letterSpacing: "0.08em" }}>Solutions Architecture</span>
@@ -96,7 +99,7 @@ function App() {
         </div>
         <div style={{ height: 1, background: `linear-gradient(90deg, ${green} 0%, transparent 60%)`, opacity: 0.2, maxWidth: 860, margin: "0 auto 48px", padding: "0 40px" }}></div>
         <div style={{ maxWidth: 860, margin: "0 auto", padding: "0 40px 80px" }}>
-          <div style={{ fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: muted, marginBottom: 24, fontStyle: "italic" }}>Available Guides</div>
+          <div style={{ fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: muted, marginBottom: 24, fontStyle: "italic" }}>// available guides</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             {concepts.map((c, i) => (
               <Card key={i} c={c} hovered={hovered === i} onEnter={() => setHovered(i)} onLeave={() => setHovered(null)} />
@@ -105,7 +108,7 @@ function App() {
         </div>
         <div style={{ borderTop: `1px solid ${cardBorder}`, padding: "28px 40px", display: "flex", justifyContent: "space-between", alignItems: "center", maxWidth: 860, margin: "0 auto" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 16, height: 16, background: green, borderRadius: "0 50% 0 50%", transform: "rotate(-45deg)", opacity: 0.5 }}></div>
+            <span style={{ opacity: 0.5, display: "flex", alignItems: "center" }} dangerouslySetInnerHTML={{ __html: mongoLeafSmall }} />
             <span style={{ fontSize: 12, color: muted, fontStyle: "italic" }}>MongoDB Atlas · Solutions Architecture</span>
           </div>
           <span style={{ fontSize: 12, color: cardBorder, fontStyle: "italic" }}>kavyashivashankar.github.io/mongodbconcepts</span>
