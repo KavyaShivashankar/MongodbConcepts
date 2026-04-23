@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MongoDB Replica Sets Explained</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0A1628; font-family: Georgia, serif; color: #E8F4FF; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const green = "#00ED64";
+const bg = "#0A1628";
+const card = "#0F1F3D";
+const cardBorder = "#1A3560";
+const text = "#E8F4FF";
+const muted = "#7A9CC0";
+
+const mongoLeafSvg = '<svg width="22" height="22" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M128 13 C128 13 61 88.5 61 152.5 C61 188.9 91.2 218.5 128 218.5 C164.8 218.5 195 188.9 195 152.5 C195 88.5 128 13 128 13Z" fill="#00ED64"/><path d="M128 218.5 L128 243" stroke="#00ED64" stroke-width="8" stroke-linecap="round"/></svg>';
+
+const sections = [
+  {
+    id: "what", label: "What Is It?", icon: "🔵",
+    headline: "Automatic high availability for MongoDB",
+    body: "A Replica Set is a group of MongoDB instances (mongod processes) that maintain the same dataset. One node is the Primary — it receives all writes. The others are Secondaries — they continuously replicate data from the Primary via the oplog. If the Primary becomes unavailable, an automatic election promotes a Secondary in seconds.",
+    callout: "A 3-node replica set is the minimum recommended for production — it allows a majority vote even if one node fails.",
+    visual: "topology", values: null
+  },
+  {
+    id: "how", label: "How It Works", icon: "⚙️",
+    headline: "Oplog replication + automatic election",
+    body: "Every write to the Primary is recorded in a capped collection called the oplog. Secondaries continuously tail this oplog and apply the same operations locally. Every member sends heartbeats to every other member every 2 seconds. If a Secondary detects the Primary is unreachable for electionTimeoutMillis (default 10s), it calls an election. The node with the most up-to-date oplog and a majority of votes wins.",
+    callout: "Typical election time: 10–30 seconds. The MongoDB driver reconnects automatically — no application code changes required.",
+    visual: "election", values: null
+  },
+  {
+    id: "why", label: "Why It Matters", icon: "💡",
+    headline: "Why customers invest in Replica Sets",
+    body: null, callout: null, visual: "value",
+    values: [
+      { title: "High Availability", desc: "Automatic failover in 10–30 seconds. No manual intervention, no 3am pages, no runbooks required.", icon: "🛡️" },
+      { title: "Data Redundancy", desc: "Data lives on 3+ nodes simultaneously — across AZs or data centers. Hardware failure doesn't mean data loss.", icon: "💾" },
+      { title: "Read Scaling", desc: "Route read traffic to Secondaries via read preferences. Offload analytics without impacting production writes.", icon: "📖" },
+      { title: "Zero-Downtime Maintenance", desc: "Roll patches and upgrades one node at a time. Step down the Primary last. Total user-facing downtime: ~10 seconds.", icon: "🔧" },
+      { title: "Disaster Recovery", desc: "Deploy members across regions. A delayed secondary acts as a live time machine for accidental deletions.", icon: "🌍" },
+      { title: "RPO ~0 · RTO ~30s", desc: "With w:majority and journaling, you get near-zero data loss and sub-minute recovery — meeting the toughest SLAs.", icon: "📜" }
+    ]
+  },
+  {
+    id: "writeconcerns", label: "Write Concerns", icon: "✍️",
+    headline: "Tuning durability vs. performance",
+    body: "Write concerns let you control when MongoDB acknowledges a write — trading latency for durability. The right setting depends on the workload and the consequences of data loss.",
+    callout: "For financial transactions and orders, always use w:majority with j:true. For high-volume metrics ingestion, w:1 or w:0 may be acceptable.",
+    visual: "writeconcerns", values: null
+  },
+  {
+    id: "atlas", label: "On Atlas", icon: "☁️",
+    headline: "Atlas makes Replica Sets operational",
+    body: "MongoDB Atlas provisions a 3-node replica set by default for every cluster. Atlas handles node provisioning, oplog sizing, election tuning, cross-AZ distribution, backup, and monitoring automatically. You get all the HA benefits without the operational complexity.",
+    callout: "Atlas Multi-Region clusters extend replica sets across cloud regions — enabling geographic data distribution with point-and-click simplicity.",
+    visual: null, values: null
+  },
+  {
+    id: "discovery", label: "Discovery Questions", icon: "🔍",
+    headline: "Discovery Questions",
+    body: null, callout: null, visual: "discovery", values: null
+  }
+];
+
+const discoveryQs = [
+  {
+    icon: "🏥",
+    title: "Current State & Pain",
+    qs: [
+      "What happens today when your database server goes down? Walk me through the last incident.",
+      "What is the business cost of one hour of database downtime? Have you ever quantified it?",
+      "Do you currently have a hot, warm, or cold standby? How long does failover take today?"
+    ]
+  },
+  {
+    icon: "🎯",
+    title: "Requirements & SLAs",
+    qs: [
+      "What are your RTO and RPO requirements — formally defined or informal targets?",
+      "Do you have uptime SLAs with your customers? What's the financial penalty for missing them?",
+      "How do you handle planned maintenance — OS patches, database upgrades, security hotfixes?"
+    ]
+  },
+  {
+    icon: "🏗️",
+    title: "Architecture & Scale",
+    qs: [
+      "Are your users or services spread across multiple regions? Where are your reads heaviest?",
+      "Do you have separate systems for operational and analytics workloads? What does the pipeline look like?",
+      "Have you ever experienced data loss from a failed backup or accidental deletion? How did you recover?"
+    ]
+  },
+  {
+    icon: "👥",
+    title: "Team & Operations",
+    qs: [
+      "Who gets paged when the database goes down at 3am? How many people are involved in recovery?",
+      "Is your team comfortable managing HA infrastructure, or is that a skill gap you're trying to address?"
+    ]
+  }
+];
+
+// ── Live SVG Simulation ──────────────────────────────────────────────
+function ReplicaSimulation() {
+  const [nodes, setNodes] = React.useState([
+    { id: 0, name: "mongo-01", role: "primary",   status: "up" },
+    { id: 1, name: "mongo-02", role: "secondary", status: "up" },
+    { id: 2, name: "mongo-03", role: "secondary", status: "up" },
+  ]);
+  const [log, setLog] = React.useState([{ msg: "▶ Replica set initialized. 1 Primary, 2 Secondaries online.", type: "ok" }]);
+  const [writeCount, setWriteCount] = React.useState(0);
+  const [failed, setFailed] = React.useState(false);
+  const logRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
+  }, [log]);
+
+  const addLog = (msg, type = "") => setLog(prev => [...prev, { msg, type }]);
+
+  const ts = () => new Date().toLocaleTimeString("en-US", { hour12: false });
+
+  const simWrite = () => {
+    const primary = nodes.find(n => n.role === "primary" && n.status === "up");
+    if (!primary) { addLog(`[${ts()}] ✗ No primary available. Writes blocked.`, "err"); return; }
+    const next = writeCount + 1;
+    setWriteCount(next);
+    addLog(`[${ts()}] ✓ Write accepted by ${primary.name} (Primary) — {_id: ${next}, ts: ${Date.now()}}`, "ok");
+    const secs = nodes.filter(n => n.role === "secondary" && n.status === "up");
+    setTimeout(() => secs.forEach(s => addLog(`[${ts()}]   ↳ Replicated to ${s.name} via oplog`, "")), 300);
+  };
+
+  const simRead = () => {
+    const sec = nodes.find(n => n.role === "secondary" && n.status === "up");
+    if (!sec) { addLog(`[${ts()}] No secondary available. Read falls back to primary.`, "warn"); return; }
+    addLog(`[${ts()}] 📖 Read routed to ${sec.name} (Secondary) — offloading primary, latency: ~2ms`, "ok");
+  };
+
+  const simFailover = () => {
+    if (failed) { addLog(`[${ts()}] Primary already down. Reset first.`, "warn"); return; }
+    const primary = nodes.find(n => n.role === "primary");
+    setFailed(true);
+    setNodes(prev => prev.map(n => n.id === primary.id ? { ...n, status: "down" } : n));
+    addLog(`[${ts()}] 💥 ${primary.name} is unreachable. Heartbeat timeout triggered.`, "err");
+    addLog(`[${ts()}] ⏳ Election in progress... secondaries voting...`, "warn");
+    setTimeout(() => {
+      setNodes(prev => {
+        const candidates = prev.filter(n => n.role === "secondary" && n.status === "up");
+        if (candidates.length === 0) { addLog(`[${ts()}] ✗ No election possible — no majority.`, "err"); return prev; }
+        addLog(`[${ts()}] 🗳️  ${candidates[0].name} elected as new Primary (majority vote).`, "ok");
+        addLog(`[${ts()}] ✅ Replica set healthy. Writes resuming automatically.`, "ok");
+        return prev.map(n => n.id === candidates[0].id ? { ...n, role: "primary" } : n);
+      });
+    }, 2500);
+  };
+
+  const simReset = () => {
+    setNodes([
+      { id: 0, name: "mongo-01", role: "primary",   status: "up" },
+      { id: 1, name: "mongo-02", role: "secondary", status: "up" },
+      { id: 2, name: "mongo-03", role: "secondary", status: "up" },
+    ]);
+    setFailed(false);
+    setWriteCount(0);
+    setLog([{ msg: "↺ Replica set reset. 1 Primary, 2 Secondaries online.", type: "ok" }]);
+  };
+
+  // Triangle positions (percentages)
+  const positions = [
+    { x: 50, y: 10 },
+    { x: 14, y: 82 },
+    { x: 86, y: 82 },
+  ];
+
+  const nodeColor = (n) => {
+    if (n.status === "down") return { border: "#FF6960", bg: "rgba(255,105,96,0.08)", label: "#FF6960" };
+    if (n.role === "primary") return { border: green, bg: "rgba(0,237,100,0.08)", label: green };
+    return { border: cardBorder, bg: card, label: muted };
+  };
+
+  const nodeIcon = (n) => n.status === "down" ? "💀" : n.role === "primary" ? "👑" : "🗄️";
+  const nodeRoleText = (n) => n.status === "down" ? "OFFLINE" : n.role.toUpperCase();
+
+  const pairs = [[0,1],[0,2],[1,2]];
+
+  return (
+    <div>
+      {/* SVG triangle */}
+      <div style={{ position: "relative", width: "60%", margin: "0 auto", height: 260 }}>
+        <svg style={{ position:"absolute",inset:0,width:"100%",height:"100%",overflow:"visible" }}
+             viewBox="0 0 100 100" preserveAspectRatio="none">
+          <defs>
+            <filter id="glow2">
+              <feGaussianBlur stdDeviation="0.8" result="blur"/>
+              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          {pairs.map(([a,b]) => {
+            const alive = nodes[a].status !== "down" && nodes[b].status !== "down";
+            return (
+              <line key={`${a}-${b}`}
+                x1={positions[a].x} y1={positions[a].y}
+                x2={positions[b].x} y2={positions[b].y}
+                stroke={alive ? "rgba(0,237,100,0.35)" : "rgba(255,105,96,0.25)"}
+                strokeWidth="0.6"
+                strokeDasharray={alive ? "none" : "4 4"}
+              />
+            );
+          })}
+          {pairs.map(([a,b]) => {
+            const alive = nodes[a].status !== "down" && nodes[b].status !== "down";
+            if (!alive) return null;
+            return [0, 1.0].map(delay => (
+              <circle key={`dot-${a}-${b}-${delay}`} r="0.6" fill={green} filter="url(#glow2)">
+                <animateMotion dur="3s" repeatCount="indefinite" begin={`${delay}s`}
+                  path={`M${positions[a].x},${positions[a].y} L${positions[b].x},${positions[b].y}`}/>
+              </circle>
+            ));
+          })}
+          {pairs.map(([a,b]) => {
+            const alive = nodes[a].status !== "down" && nodes[b].status !== "down";
+            if (!alive) return null;
+            return [0.4, 1.3].map(delay => (
+              <circle key={`rdot-${a}-${b}-${delay}`} r="0.6" fill="rgba(0,237,100,0.5)">
+                <animateMotion dur="3.8s" repeatCount="indefinite" begin={`${delay}s`}
+                  path={`M${positions[b].x},${positions[b].y} L${positions[a].x},${positions[a].y}`}/>
+              </circle>
+            ));
+          })}
+        </svg>
+
+        {nodes.map((node, i) => {
+          const c = nodeColor(node);
+          return (
+            <div key={node.id} style={{
+              position:"absolute", left:`${positions[i].x}%`, top:`${positions[i].y}%`,
+              transform:"translate(-50%,-50%)", display:"flex", flexDirection:"column",
+              alignItems:"center", gap:8
+            }}>
+              <div style={{
+                width:90, height:90, borderRadius:12, border:`2px solid ${c.border}`,
+                background:c.bg, display:"flex", flexDirection:"column",
+                alignItems:"center", justifyContent:"center", gap:5,
+                boxShadow: node.role==="primary" && node.status==="up" ? `0 0 24px rgba(0,237,100,0.2)` : "none"
+              }}>
+                <span style={{ fontSize:24 }}>{nodeIcon(node)}</span>
+                <span style={{ fontFamily:"monospace", fontSize:9, letterSpacing:1, color:c.label, textTransform:"uppercase" }}>
+                  {nodeRoleText(node)}
+                </span>
+              </div>
+              <span style={{ fontSize:11, fontWeight:600, color:text, whiteSpace:"nowrap" }}>{node.name}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Controls */}
+      <div style={{ display:"flex", gap:10, flexWrap:"wrap", marginTop:20 }}>
+        {[
+          { label:"📝 Simulate Write", fn: simWrite, style:{ background:green, color:bg, border:`1px solid ${green}`, fontWeight:700 } },
+          { label:"📖 Read from Secondary", fn: simRead, style:{ background:"transparent", color:green, border:`1px solid ${cardBorder}` } },
+          { label:"💥 Kill Primary", fn: simFailover, style:{ background:"transparent", color:"#FF6960", border:"1px solid rgba(255,105,96,0.35)" } },
+          { label:"↺ Reset", fn: simReset, style:{ background:"transparent", color:green, border:`1px solid ${cardBorder}` } },
+        ].map(btn => (
+          <button key={btn.label} onClick={btn.fn} style={{
+            fontFamily:"monospace", fontSize:11, letterSpacing:1, textTransform:"uppercase",
+            padding:"9px 18px", borderRadius:6, cursor:"pointer", ...btn.style
+          }}>{btn.label}</button>
+        ))}
+      </div>
+
+      {/* Log */}
+      <div ref={logRef} style={{
+        background:"#060F1E", border:`1px solid ${cardBorder}`, borderRadius:8,
+        padding:14, marginTop:16, fontFamily:"monospace", fontSize:11,
+        lineHeight:1.9, minHeight:80, maxHeight:130, overflowY:"auto"
+      }}>
+        {log.map((e,i) => (
+          <div key={i} style={{ color: e.type==="ok" ? green : e.type==="err" ? "#FF6960" : e.type==="warn" ? "#FFC010" : muted }}>
+            {e.msg}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Write Concerns Table ─────────────────────────────────────────────
+function WriteConcernsTable() {
+  const rows = [
+    { concern:"w: 1",        meaning:"Acknowledged by Primary only",            best:"Low-latency workloads, logs" },
+    { concern:"w: majority", meaning:"Acknowledged by majority of voting nodes", best:"Financial data, orders, critical writes" },
+    { concern:"w: 0",        meaning:"Fire-and-forget (no acknowledgement)",     best:"Metrics, high-volume analytics ingestion" },
+    { concern:"j: true",     meaning:"Written to on-disk journal before ack",    best:"Compliance, strong durability requirements" },
+  ];
+  return (
+    <table style={{ width:"100%", borderCollapse:"collapse", fontSize:14, marginTop:16 }}>
+      <thead>
+        <tr>
+          {["Write Concern","Meaning","Best For"].map(h => (
+            <th key={h} style={{ fontFamily:"monospace", fontSize:11, letterSpacing:1, textTransform:"uppercase",
+              color:green, textAlign:"left", padding:"10px 14px", borderBottom:`1px solid ${cardBorder}` }}>{h}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r,i) => (
+          <tr key={i}>
+            <td style={{ padding:"12px 14px", borderBottom:`1px solid rgba(26,53,96,0.5)`, fontFamily:"monospace", color:green, fontSize:12 }}>{r.concern}</td>
+            <td style={{ padding:"12px 14px", borderBottom:`1px solid rgba(26,53,96,0.5)`, color:muted }}>{r.meaning}</td>
+            <td style={{ padding:"12px 14px", borderBottom:`1px solid rgba(26,53,96,0.5)`, color:muted }}>{r.best}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+// ── Election Steps ────────────────────────────────────────────────────
+function ElectionViz() {
+  const steps = [
+    { icon:"💓", title:"Heartbeats", desc:"Every node pings every other node every 2 seconds." },
+    { icon:"⚡", title:"Failure Detected", desc:"If a Secondary gets no heartbeat for electionTimeoutMillis (10s), it calls an election." },
+    { icon:"🗳️", title:"Voting", desc:"Nodes vote for the candidate with the most up-to-date oplog. Majority needed to win." },
+    { icon:"👑", title:"New Primary", desc:"Winning node becomes Primary. Drivers reconnect automatically. Writes resume." },
+  ];
+  return (
+    <div style={{ display:"flex", gap:0, marginTop:20, flexWrap:"wrap" }}>
+      {steps.map((s,i) => (
+        <div key={i} style={{ display:"flex", alignItems:"center", gap:0, flexWrap:"wrap" }}>
+          <div style={{ background:card, border:`1px solid ${cardBorder}`, borderRadius:10, padding:"16px 20px",
+            width:180, textAlign:"center", flexShrink:0 }}>
+            <div style={{ fontSize:28, marginBottom:8 }}>{s.icon}</div>
+            <div style={{ fontSize:13, fontWeight:700, color:text, marginBottom:6 }}>{s.title}</div>
+            <div style={{ fontSize:12, color:muted, lineHeight:1.5 }}>{s.desc}</div>
+          </div>
+          {i < steps.length - 1 && (
+            <div style={{ color:green, fontSize:20, padding:"0 8px", opacity:0.7 }}>→</div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Main App ─────────────────────────────────────────────────────────
+function App() {
+  const [activeSection, setActiveSection] = React.useState("what");
+  const [openDiscovery, setOpenDiscovery] = React.useState(null);
+
+  const current = sections.find(s => s.id === activeSection);
+
+  const renderVisual = (s) => {
+    if (s.visual === "topology") return (
+      <div style={{ marginTop:24 }}>
+        <ReplicaSimulation />
+        <div style={{ background:"rgba(0,237,100,0.06)", border:`1px solid rgba(0,237,100,0.2)`,
+          borderRadius:8, padding:"12px 16px", marginTop:16, fontSize:13, color:muted, lineHeight:1.7 }}>
+          💡 <strong style={{ color:text }}>SA Tip:</strong> Click <strong style={{color:green}}>"💥 Kill Primary"</strong> in customer demos.
+          The 10–30 second automatic recovery is more compelling than any slide.
+        </div>
+      </div>
+    );
+    if (s.visual === "election") return <ElectionViz />;
+    if (s.visual === "writeconcerns") return <WriteConcernsTable />;
+    if (s.visual === "value") return (
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(280px,1fr))", gap:14, marginTop:20 }}>
+        {s.values.map((v,i) => (
+          <div key={i} style={{ background:card, border:`1px solid ${cardBorder}`, borderRadius:10, padding:"20px 22px" }}>
+            <div style={{ fontSize:26, marginBottom:10 }}>{v.icon}</div>
+            <div style={{ fontSize:14, fontWeight:700, color:text, marginBottom:6 }}>{v.title}</div>
+            <div style={{ fontSize:13, color:muted, lineHeight:1.6 }}>{v.desc}</div>
+          </div>
+        ))}
+      </div>
+    );
+    if (s.visual === "discovery") return (
+      <div style={{ marginTop:8 }}>
+        <p style={{ fontSize:13, color:muted, marginBottom:20, lineHeight:1.7 }}>
+          Use these questions to surface customer pain, risk tolerance, and architecture gaps before positioning Replica Sets.
+          Click any question to reveal why it matters.
+        </p>
+        {discoveryQs.map((cat,ci) => (
+          <div key={ci} style={{ marginBottom:28 }}>
+            <div style={{ fontFamily:"monospace", fontSize:11, letterSpacing:2, textTransform:"uppercase",
+              color:green, marginBottom:12, display:"flex", alignItems:"center", gap:10 }}>
+              {cat.icon} {cat.title}
+              <div style={{ flex:1, height:1, background:cardBorder }}/>
+            </div>
+            {cat.qs.map((q,qi) => {
+              const key = `${ci}-${qi}`;
+              const open = openDiscovery === key;
+              const hints = [
+                "Listen for: Manual intervention, extended downtime, war room stories. A painful story is your best opening.",
+                "Listen for: Revenue per hour, SLA penalties, churn. Even $10K/hr makes a 3-node Atlas cluster look cheap.",
+                "Listen for: Manual DNS cutover, 30min+ recovery. Replica Sets automate this entirely.",
+                "Listen for: Undefined RTOs/RPOs — helping them define these positions you as a strategic partner.",
+                "Listen for: 99.99% SLA = only 52 min downtime/year. Very hard to hit without automatic failover.",
+                "Listen for: 2am maintenance windows. Rolling upgrades eliminate these entirely.",
+                "Listen for: Global user base, latency complaints. Opens the geo-distributed replica set conversation.",
+                "Listen for: ETL pipelines hammering production. A hidden secondary can serve analytics without impact.",
+                "Listen for: 'We restored from 6 hours ago.' A delayed secondary is a live time-machine.",
+                "Listen for: Pager fatigue, escalation chains. Automated failover reduces on-call burden significantly.",
+                "Listen for: Small teams, DBAs left. Opens the Atlas managed-service conversation.",
+              ];
+              const hintIdx = ci * 4 + qi;
+              return (
+                <div key={qi} onClick={() => setOpenDiscovery(open ? null : key)}
+                  style={{ background:card, border:`1px solid ${open ? "rgba(0,237,100,0.3)" : cardBorder}`,
+                    borderRadius:8, padding:"14px 18px", marginBottom:8, cursor:"pointer",
+                    transition:"border-color 0.2s" }}>
+                  <div style={{ display:"flex", gap:12, alignItems:"flex-start" }}>
+                    <span style={{ fontFamily:"monospace", fontSize:11, color:green, opacity:0.6, paddingTop:2, flexShrink:0 }}>
+                      Q{qi+1}
+                    </span>
+                    <div>
+                      <div style={{ fontSize:14, color:text, lineHeight:1.5 }}>{q}</div>
+                      {open && (
+                        <div style={{ marginTop:10, paddingTop:10, borderTop:`1px solid ${cardBorder}`,
+                          fontSize:12, color:muted, lineHeight:1.6 }}>
+                          <em style={{ color:"#FFC010", fontStyle:"normal" }}>Listen for: </em>
+                          {hints[hintIdx] ? hints[hintIdx].replace("Listen for: ","") : "Surface the customer's current pain and how it maps to Replica Set value."}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    );
+    return null;
+  };
+
+  return (
+    <div style={{ minHeight:"100vh", background:bg }}>
+      {/* Header */}
+      <div style={{ background:"#060F1E", borderBottom:`1px solid ${cardBorder}`, padding:"20px 40px",
+        display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+          <span dangerouslySetInnerHTML={{ __html: mongoLeafSvg }}/>
+          <div>
+            <div style={{ fontSize:11, fontFamily:"monospace", letterSpacing:2, textTransform:"uppercase", color:green, opacity:0.7 }}>
+              Solutions Architect Toolkit
+            </div>
+            <div style={{ fontSize:22, fontWeight:700, color:text, letterSpacing:-0.5 }}>
+              MongoDB <span style={{ color:green }}>Replica Sets</span>
+            </div>
+          </div>
+        </div>
+        <a href="./index.html" style={{ fontFamily:"monospace", fontSize:11, letterSpacing:1, textTransform:"uppercase",
+          color:muted, textDecoration:"none", border:`1px solid ${cardBorder}`, padding:"6px 14px", borderRadius:6 }}>
+          ← All Concepts
+        </a>
+      </div>
+
+      {/* Hero */}
+      <div style={{ padding:"40px 40px 0", maxWidth:900, margin:"0 auto" }}>
+        <div style={{ display:"inline-flex", alignItems:"center", gap:8, background:"rgba(0,237,100,0.08)",
+          border:`1px solid rgba(0,237,100,0.2)`, borderRadius:4, padding:"5px 12px",
+          fontFamily:"monospace", fontSize:10, color:green, letterSpacing:2, textTransform:"uppercase", marginBottom:16 }}>
+          High Availability
+        </div>
+        <h1 style={{ fontSize:"clamp(28px,5vw,46px)", fontWeight:700, lineHeight:1.2, marginBottom:14, letterSpacing:-1 }}>
+          Replica Sets Explained
+        </h1>
+        <p style={{ fontSize:16, color:muted, lineHeight:1.7, maxWidth:640, marginBottom:40 }}>
+          MongoDB's built-in mechanism for automatic failover, data redundancy, and zero-downtime maintenance —
+          the foundation of every production deployment.
+        </p>
+      </div>
+
+      {/* Nav */}
+      <div style={{ padding:"0 40px", maxWidth:900, margin:"0 auto" }}>
+        <div style={{ display:"flex", gap:4, borderBottom:`1px solid ${cardBorder}`, overflowX:"auto",
+          scrollbarWidth:"none", marginBottom:32 }}>
+          {sections.map(s => (
+            <button key={s.id} onClick={() => setActiveSection(s.id)} style={{
+              fontFamily:"monospace", fontSize:11, letterSpacing:1, textTransform:"uppercase",
+              padding:"10px 16px", border:"none", background:"transparent", cursor:"pointer",
+              color: activeSection === s.id ? green : muted,
+              borderBottom: activeSection === s.id ? `2px solid ${green}` : "2px solid transparent",
+              marginBottom:-1, whiteSpace:"nowrap", transition:"color 0.2s"
+            }}>
+              {s.icon} {s.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Section content */}
+        <div style={{ maxWidth:860, paddingBottom:60 }}>
+          <div style={{ fontSize:11, fontFamily:"monospace", letterSpacing:2, textTransform:"uppercase",
+            color:green, marginBottom:12, opacity:0.7 }}>{current.icon} {current.label}</div>
+          <h2 style={{ fontSize:"clamp(18px,3vw,28px)", fontWeight:700, marginBottom:16, lineHeight:1.3, letterSpacing:-0.5 }}>
+            {current.headline}
+          </h2>
+
+          {current.body && (
+            <p style={{ fontSize:15, color:muted, lineHeight:1.8, marginBottom: current.callout ? 20 : 0 }}>
+              {current.body}
+            </p>
+          )}
+
+          {current.callout && (
+            <div style={{ borderLeft:`3px solid ${green}`, padding:"14px 20px", background:"rgba(0,237,100,0.05)",
+              borderRadius:"0 8px 8px 0", fontSize:14, color:muted, lineHeight:1.7, marginBottom:8 }}>
+              {current.callout}
+            </div>
+          )}
+
+          {renderVisual(current)}
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div style={{ textAlign:"center", padding:"30px 24px", fontFamily:"monospace", fontSize:11,
+        color:"#2A4060", letterSpacing:1, borderTop:`1px solid ${cardBorder}` }}>
+        MONGODB · SOLUTIONS ARCHITECT TOOLKIT · REPLICA SETS
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.render(<App />, document.getElementById("root"));
+</script>
+</body>
+</html>
