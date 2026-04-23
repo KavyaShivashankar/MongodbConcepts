@@ -24,13 +24,19 @@ const mongoLeafSmall = '<svg width="16" height="16" viewBox="0 0 256 256" fill="
 
 const concepts = [
   {
-    num: "01", icon: "⚡", category: "Scalability", title: "Sharding",
+    num: "01", icon: "⚡", category: "High Availability", title: "Replica Sets",
+    desc: "How MongoDB achieves high availability via replica sets",
+    tags: ["High Availability", "Data Distribution"],
+    href: "./replica-set.html"
+  },
+  {
+    num: "02", icon: "⚡", category: "Scalability", title: "Sharding",
     desc: "How MongoDB distributes data horizontally across shards — and why it matters for scale-out architectures.",
     tags: ["Horizontal Scale", "Data Distribution", "Shard Keys", "Zone Sharding"],
     href: "./sharding.html"
   },
   {
-    num: "02", icon: "🔵", category: "Performance", title: "Workload Isolation",
+    num: "03", icon: "🔵", category: "Performance", title: "Workload Isolation",
     desc: "Run OLTP, analytics, search, and reporting simultaneously — without any workload degrading another.",
     tags: ["Analytics Nodes", "Atlas Search", "Online Archive", "SLA Protection"],
     href: "./workload-isolation.html"
