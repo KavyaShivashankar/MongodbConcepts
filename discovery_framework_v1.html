@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MongoDB Discovery Framework</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c10;
+    --surface: #111318;
+    --border: #1e2230;
+    --cs-color: #3b82f6;
+    --cs-bg: rgba(59,130,246,0.08);
+    --nc-color: #ef4444;
+    --nc-bg: rgba(239,68,68,0.08);
+    --fs-color: #22c55e;
+    --fs-bg: rgba(34,197,94,0.08);
+    --pc-color: #f59e0b;
+    --pc-bg: rgba(245,158,11,0.08);
+    --text: #e8eaf0;
+    --muted: #6b7280;
+    --accent: #00e5ff;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrapper {
+    position: relative;
+    z-index: 1;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+
+  /* Header */
+  header {
+    text-align: center;
+    margin-bottom: 48px;
+    animation: fadeDown 0.7s ease both;
+  }
+
+  .badge {
+    display: inline-block;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    border: 1px solid rgba(0,229,255,0.3);
+    padding: 4px 12px;
+    border-radius: 2px;
+    margin-bottom: 16px;
+  }
+
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(28px, 5vw, 52px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    color: #fff;
+    margin-bottom: 12px;
+  }
+
+  h1 span { color: var(--accent); }
+
+  .subtitle {
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+
+  /* Pillar Tabs */
+  .tabs {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 40px;
+    flex-wrap: wrap;
+    animation: fadeUp 0.6s 0.2s ease both;
+  }
+
+  .tab {
+    font-family: 'Syne', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 10px 20px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .tab::before {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent);
+    transform: scaleX(0);
+    transition: transform 0.2s;
+  }
+
+  .tab:hover { color: var(--text); border-color: rgba(0,229,255,0.3); }
+  .tab:hover::before { transform: scaleX(0.5); }
+
+  .tab.active {
+    background: rgba(0,229,255,0.06);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .tab.active::before { transform: scaleX(1); }
+
+  /* Pillar panels */
+  .pillar-panel { display: none; animation: fadeUp 0.4s ease both; }
+  .pillar-panel.active { display: block; }
+
+  .pillar-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: center;
+    margin-bottom: 24px;
+  }
+
+  /* Quadrant grid */
+  .quadrant {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 2px;
+    background: var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+
+  .quad-cell {
+    background: var(--surface);
+    padding: 28px;
+    position: relative;
+    overflow: hidden;
+    min-height: 320px;
+  }
+
+  /* Corner labels */
+  .quad-cell::after {
+    content: attr(data-label);
+    position: absolute;
+    top: 14px; right: 16px;
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    opacity: 0.35;
+  }
+
+  /* Quadrant color accents */
+  .quad-cs { border-top: 3px solid var(--cs-color); }
+  .quad-cs::after { color: var(--cs-color); }
+  .quad-cs .quad-glow { background: radial-gradient(ellipse at top left, rgba(59,130,246,0.1) 0%, transparent 60%); }
+
+  .quad-nc { border-top: 3px solid var(--nc-color); }
+  .quad-nc::after { color: var(--nc-color); }
+  .quad-nc .quad-glow { background: radial-gradient(ellipse at top right, rgba(239,68,68,0.1) 0%, transparent 60%); }
+
+  .quad-fs { border-top: 3px solid var(--fs-color); }
+  .quad-fs::after { color: var(--fs-color); }
+  .quad-fs .quad-glow { background: radial-gradient(ellipse at bottom left, rgba(34,197,94,0.1) 0%, transparent 60%); }
+
+  .quad-pc { border-top: 3px solid var(--pc-color); }
+  .quad-pc::after { color: var(--pc-color); }
+  .quad-pc .quad-glow { background: radial-gradient(ellipse at bottom right, rgba(245,158,11,0.1) 0%, transparent 60%); }
+
+  .quad-glow {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .quad-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    position: relative;
+  }
+
+  .quad-icon {
+    font-size: 20px;
+    line-height: 1;
+  }
+
+  .quad-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+  }
+
+  .quad-cs .quad-title { color: var(--cs-color); }
+  .quad-nc .quad-title { color: var(--nc-color); }
+  .quad-fs .quad-title { color: var(--fs-color); }
+  .quad-pc .quad-title { color: var(--pc-color); }
+
+  .quad-tagline {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+    margin-bottom: 18px;
+    position: relative;
+  }
+
+  /* Question cards */
+  .q-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    position: relative;
+  }
+
+  .q-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .q-card:hover {
+    background: rgba(255,255,255,0.06);
+    transform: translateX(4px);
+  }
+
+  .quad-cs .q-card:hover { border-color: var(--cs-color); }
+  .quad-nc .q-card:hover { border-color: var(--nc-color); }
+  .quad-fs .q-card:hover { border-color: var(--fs-color); }
+  .quad-pc .q-card:hover { border-color: var(--pc-color); }
+
+  .q-id {
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.15em;
+    margin-bottom: 5px;
+    opacity: 0.5;
+  }
+
+  .q-text {
+    font-size: 11.5px;
+    line-height: 1.6;
+    color: #c8cad4;
+  }
+
+  .q-expand {
+    display: none;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.65;
+  }
+
+  .q-expand-label {
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    opacity: 0.6;
+  }
+
+  .q-card.open .q-expand { display: block; }
+
+  .q-card.open .q-text { color: var(--text); }
+
+  /* Center axis labels */
+  .axis-labels {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    pointer-events: none;
+    margin-top: -1px;
+  }
+
+  /* Footer flow */
+  .flow-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    margin-top: 32px;
+    animation: fadeUp 0.6s 0.4s ease both;
+  }
+
+  .flow-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 10px 20px;
+    border-radius: 4px;
+    min-width: 130px;
+  }
+
+  .flow-step .step-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    margin-bottom: 4px;
+  }
+
+  .flow-step .step-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .flow-step .step-desc {
+    font-size: 9px;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  .flow-cs .step-dot { background: var(--cs-color); }
+  .flow-cs .step-name { color: var(--cs-color); }
+  .flow-nc .step-dot { background: var(--nc-color); }
+  .flow-nc .step-name { color: var(--nc-color); }
+  .flow-fs .step-dot { background: var(--fs-color); }
+  .flow-fs .step-name { color: var(--fs-color); }
+  .flow-pc .step-dot { background: var(--pc-color); }
+  .flow-pc .step-name { color: var(--pc-color); }
+
+  .flow-arrow {
+    font-size: 18px;
+    color: var(--border);
+    padding: 0 4px;
+    margin-bottom: 12px;
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .quadrant {
+      grid-template-columns: 1fr;
+      grid-template-rows: repeat(4, auto);
+    }
+    .quad-cell { min-height: 200px; }
+    .flow-bar { flex-wrap: wrap; }
+  }
+
+  @keyframes fadeDown {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* Expand toggle icon */
+  .q-toggle {
+    float: right;
+    font-size: 10px;
+    opacity: 0.4;
+    transition: transform 0.2s;
+  }
+  .q-card.open .q-toggle { transform: rotate(180deg); opacity: 0.7; }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <header>
+    <div class="badge">MongoDB Presales</div>
+    <h1>Discovery <span>Framework</span></h1>
+    <p class="subtitle">Current State → Negative Consequences → Future State → Positive Consequences</p>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" data-pillar="ha">🔷 High Availability</button>
+    <button class="tab" data-pillar="sc">📈 Scalability</button>
+    <button class="tab" data-pillar="os">⚙️ Operational Simplicity</button>
+    <button class="tab" data-pillar="dv">🚀 Developer Velocity</button>
+    <button class="tab" data-pillar="st">🎯 Strategic</button>
+  </div>
+
+  <!-- HIGH AVAILABILITY -->
+  <div class="pillar-panel active" id="panel-ha">
+    <p class="pillar-title">Pillar 1 — High Availability</p>
+    <div class="quadrant">
+
+      <div class="quad-cell quad-cs" data-label="Current State">
+        <div class="quad-glow"></div>
+        <div class="quad-header">
+          <span class="quad-icon">🔵</span>
+          <div>
+            <div class="quad-title">Current State</div>
+          </div>
+        </div>
+        <p class="quad-tagline">Establish facts, build credibility — understand architecture as it exists today</p>
+        <div class="q-list">
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">HA-CS-1 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"Walk me through your current high availability architecture end to end — from how data is written to how it stays available if a node fails."</div>
+            <div class="q-expand"><div class="q-expand-label">Listen for</div>Manual steps, single points of failure, tribal knowledge, AZ vs. region-level redundancy gaps.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">HA-CS-2 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"How many nines of availability are you contractually committed to — and how are you actually measuring whether you're hitting that number consistently?"</div>
+            <div class="q-expand"><div class="q-expand-label">Listen for</div>Gap between SLA commitments and actual measurement. Most teams commit to 99.99% and measure it inconsistently.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">HA-CS-3 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"How many distinct failure domains does your database tier currently span — availability zones, regions, data centers?"</div>
+            <div class="q-expand"><div class="q-expand-label">Listen for</div>Whether their HA is real or theater. A "highly available" cluster in one AZ is node-level redundancy, not true HA.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">HA-CS-4 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"When your primary node fails today, what happens automatically vs. what requires a human — and how long does each step take?"</div>
+            <div class="q-expand"><div class="q-expand-label">Listen for</div>Partially automated failover with human-required steps is the norm. Every manual step is a risk and a delay.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">HA-CS-5 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"Tell me about your last unplanned database outage — what was the sequence of events, how long to detect, and how long to recover?"</div>
+            <div class="q-expand"><div class="q-expand-label">Listen for</div>MTTD, MTTR, and whether recovery was automated or human-dependent. Real stories are more powerful than hypotheticals.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="quad-cell quad-nc" data-label="Negative Consequences">
+        <div class="quad-glow"></div>
+        <div class="quad-header">
+          <span class="quad-icon">🔴</span>
+          <div>
+            <div class="quad-title">Negative Consequences</div>
+          </div>
+        </div>
+        <p class="quad-tagline">Surface the cost, risk, and business impact of the current state</p>
+        <div class="q-list">
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">HA-NC-1 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"What is the realistic window of unavailability during failover — and have you calculated what one hour of downtime costs during peak load?"</div>
+            <div class="q-expand"><div class="q-expand-label">The trap</div>Forces financial quantification. Once "$400K per hour" is on the table, every HA investment conversation changes.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">HA-NC-2 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"What happens to write operations acknowledged but not yet replicated at the moment of failure? What is your actual data loss exposure window?"</div>
+            <div class="q-expand"><div class="q-expand-label">The trap</div>Forces them to confront that "HA" and "zero data loss" are different architectural guarantees.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">HA-NC-3 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"If you lost an entire availability zone under peak load — have you tested that scenario, or is the answer theoretical?"</div>
+            <div class="q-expand"><div class="q-expand-label">The trap</div>Zone-level failure is the real HA test. Most architectures are only node-level resilient. Untested = unknown blast radius.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">HA-NC-4 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"During the window between primary failure and new primary election — what do application users actually experience? Automatic retries or visible errors?"</div>
+            <div class="q-expand"><div class="q-expand-label">The trap</div>Application-layer HA is the forgotten part. A database that fails over in 30 seconds still causes errors without driver-level retry logic.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">HA-NC-5 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"What percentage of your engineers' time is spent on reactive HA maintenance versus building new product features?"</div>
+            <div class="q-expand"><div class="q-expand-label">Why this question</div>Two senior engineers at 30% reactive maintenance = $200K+ annual cost of manual HA.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">HA-NC-6 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"When did you last actually test your DR plan — not simulate it in staging, but fail over a production system and formally measure recovery time?"</div>
+            <div class="q-expand"><div class="q-expand-label">The trap</div>Most teams have a DR document, not a DR capability. Untested DR is not DR.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="quad-cell quad-fs" data-label="Future State">
+        <div class="quad-glow"></div>
+        <div class="quad-header">
+          <span class="quad-icon">🟢</span>
+          <div>
+            <div class="quad-title">Future State</div>
+          </div>
+        </div>
+        <p class="quad-tagline">Paint the picture of a better world — make them articulate what good looks like</p>
+        <div class="q-list">
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">HA-FS-1 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"If your database could automatically detect failure, elect a new primary, and redirect traffic — all within 30 seconds with zero human intervention — how would that change your on-call rotation?"</div>
+            <div class="q-expand"><div class="q-expand-label">Goal</div>Let them feel the contrast between their current reality and a world without manual intervention.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">HA-FS-2 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"Imagine you could configure exactly how much data loss is acceptable per-operation — zero loss for financial writes, more flexibility for event data. How would that level of control change your architecture?"</div>
+            <div class="q-expand"><div class="q-expand-label">Goal</div>Make them articulate the value of tunable durability guarantees.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">HA-FS-3 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"If spinning up a geographically distributed, multi-region cluster was a configuration choice rather than a multi-sprint engineering project — what would you build differently?"</div>
+            <div class="q-expand"><div class="q-expand-label">Goal</div>Contrast the current effort level with self-service simplicity.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="quad-cell quad-pc" data-label="Positive Consequences">
+        <div class="quad-glow"></div>
+        <div class="quad-header">
+          <span class="quad-icon">🟡</span>
+          <div>
+            <div class="quad-title">Positive Consequences</div>
+          </div>
+        </div>
+        <p class="quad-tagline">Connect the future state to business value — make them say the ROI out loud</p>
+        <div class="q-list">
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">HA-PC-1 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"If you eliminated unplanned downtime and reduced MTTR from hours to under a minute — what would that be worth in customer retention, SLA compliance, and engineering morale?"</div>
+            <div class="q-expand"><div class="q-expand-label">Goal</div>Make them attach a dollar figure to HA improvement across multiple business dimensions simultaneously.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">HA-PC-2 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"If your HA was fully managed and on-call engineers never had to respond to a failover event again — what would those engineers build with that reclaimed time over the next 12 months?"</div>
+            <div class="q-expand"><div class="q-expand-label">Goal</div>Convert operational savings into product investment and competitive advantage.</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SCALABILITY -->
+  <div class="pillar-panel" id="panel-sc">
+    <p class="pillar-title">Pillar 2 — Scalability</p>
+    <div class="quadrant">
+      <div class="quad-cell quad-cs" data-label="Current State">
+        <div class="quad-glow"></div>
+        <div class="quad-header"><span class="quad-icon">🔵</span><div><div class="quad-title">Current State</div></div></div>
+        <p class="quad-tagline">Understand scaling constraints as they exist today</p>
+        <div class="q-list">
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">SC-CS-1 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"Describe your current scaling strategy — when you need more capacity, what is the actual process, who initiates it, how long does it take, and what impact does it have on running workloads?"</div>
+            <div class="q-expand"><div class="q-expand-label">Listen for</div>Whether scaling is self-service and fast, or a multi-team, multi-week process involving infrastructure, DBAs, and change management.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">SC-CS-2 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"What does your traffic pattern look like across a typical week? Are there predictable peaks, and how does your database handle the transition from low to peak load?"</div>
+            <div class="q-expand"><div class="q-expand-label">Listen for</div>Static over-provisioning for peak (expensive) vs. inability to scale fast enough for unexpected spikes (risky).</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">SC-CS-3 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"How large is your dataset today, what is your annual growth rate, and where do you project it in 24 months? Has your current architecture been validated at that projected scale?"</div>
+            <div class="q-expand"><div class="q-expand-label">Listen for</div>Forward-looking scale gaps. Most teams architect for today's volume. Unvalidated scale assumptions are hidden risk.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">SC-CS-4 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"Walk me through your horizontal write scaling strategy — when you reach vertical scaling limits on your primary, what is the architectural plan?"</div>
+            <div class="q-expand"><div class="q-expand-label">Listen for</div>Whether they have a real plan (Citus, Vitess, sharding) or a theoretical one. Both answers are useful.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">SC-CS-5 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"Tell me about a time when an unexpected traffic spike hit — a product launch, viral moment, marketing campaign. What happened at the database layer?"</div>
+            <div class="q-expand"><div class="q-expand-label">Listen for</div>Real scaling failure stories. Manual intervention, degraded performance, application errors — each is a concrete data point.</div>
+          </div>
+        </div>
+      </div>
+      <div class="quad-cell quad-nc" data-label="Negative Consequences">
+        <div class="quad-glow"></div>
+        <div class="quad-header"><span class="quad-icon">🔴</span><div><div class="quad-title">Negative Consequences</div></div></div>
+        <p class="quad-tagline">Surface the cost, risk, and business impact of scaling limits</p>
+        <div class="q-list">
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">SC-NC-1 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"When you reach the vertical scaling ceiling, what is your plan — and have you modeled what that re-architecture project would cost in engineering time and business disruption?"</div>
+            <div class="q-expand"><div class="q-expand-label">The trap</div>Horizontal scaling in traditional RDBMS is a multi-sprint, high-risk project. If they haven't modeled it, they're carrying hidden debt.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">SC-NC-2 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"When you shard horizontally, how do you handle queries that need to join data across shard boundaries — and how does that affect query latency and complexity?"</div>
+            <div class="q-expand"><div class="q-expand-label">The trap</div>Cross-shard joins are the scaling dead end of relational databases. There is no elegant solution.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">SC-NC-3 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"How does your licensing model work when you scale horizontally — does per-core or per-node cost scale linearly? Have you modeled that at 5x and 10x current scale?"</div>
+            <div class="q-expand"><div class="q-expand-label">The trap</div>Enterprise licensing at scale is shockingly expensive. The number, when calculated, is often the most compelling reason to evaluate alternatives.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">SC-NC-4 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"How are your developers managing the consistency model with read replicas — are they aware that reads may return stale data, and handling it in application logic?"</div>
+            <div class="q-expand"><div class="q-expand-label">The trap</div>Read replica lag creates subtle production bugs. Most developers assume replicas are consistent.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">SC-NC-5 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"What was the last time you over-provisioned for a known peak event and then ran at 30% utilization for the rest of the year? What did that idle capacity cost?"</div>
+            <div class="q-expand"><div class="q-expand-label">Why this question</div>Converts idle infrastructure into a real dollar number that justifies elastic scaling investment.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">SC-NC-6 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"How many engineering sprints did your last major scaling initiative consume — and what product features did not get built because those engineers were scaling infrastructure instead?"</div>
+            <div class="q-expand"><div class="q-expand-label">Why this question</div>Three engineers for one quarter on scaling = features that competitors shipped instead.</div>
+          </div>
+        </div>
+      </div>
+      <div class="quad-cell quad-fs" data-label="Future State">
+        <div class="quad-glow"></div>
+        <div class="quad-header"><span class="quad-icon">🟢</span><div><div class="quad-title">Future State</div></div></div>
+        <p class="quad-tagline">Paint the picture of elastic, frictionless scale</p>
+        <div class="q-list">
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">SC-FS-1 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"If your database could automatically scale compute up during a spike and back down afterward — with no human intervention and no pre-provisioning — how would that change your capacity planning?"</div>
+            <div class="q-expand"><div class="q-expand-label">Goal</div>Make them imagine a world without manual scaling intervention or over-provisioning waste.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">SC-FS-2 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"Imagine horizontal write scaling was a configuration choice rather than a re-architecture project. What would your team build if that engineering capacity was redirected to product work?"</div>
+            <div class="q-expand"><div class="q-expand-label">Goal</div>Connect scaling simplicity to product velocity and competitive output.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">SC-FS-3 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"If you could scale to 10x your current data volume without a schema change, migration window, or sharding re-architecture — what would that enable from a product and business perspective?"</div>
+            <div class="q-expand"><div class="q-expand-label">Goal</div>Elevate the conversation from technical scaling to business capability unlocks.</div>
+          </div>
+        </div>
+      </div>
+      <div class="quad-cell quad-pc" data-label="Positive Consequences">
+        <div class="quad-glow"></div>
+        <div class="quad-header"><span class="quad-icon">🟡</span><div><div class="quad-title">Positive Consequences</div></div></div>
+        <p class="quad-tagline">Connect elastic scale to revenue, cost, and velocity</p>
+        <div class="q-list">
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">SC-PC-1 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"If elastic auto-scaling meant you only paid for what you actually used — eliminating idle over-provisioning — what would that mean for your infrastructure budget over 12 months?"</div>
+            <div class="q-expand"><div class="q-expand-label">Goal</div>Quantify the direct cost savings of elastic compute vs. static provisioning.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">SC-PC-2 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"If your team never had to run a database scaling project again and could redirect that capacity entirely to product features — how many additional releases per quarter does that represent?"</div>
+            <div class="q-expand"><div class="q-expand-label">Goal</div>Convert engineering capacity reclaim into a quantified product throughput increase.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OPERATIONAL SIMPLICITY -->
+  <div class="pillar-panel" id="panel-os">
+    <p class="pillar-title">Pillar 3 — Operational Simplicity</p>
+    <div class="quadrant">
+      <div class="quad-cell quad-cs" data-label="Current State">
+        <div class="quad-glow"></div>
+        <div class="quad-header"><span class="quad-icon">🔵</span><div><div class="quad-title">Current State</div></div></div>
+        <p class="quad-tagline">Understand the operational model as it exists today</p>
+        <div class="q-list">
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">OS-CS-1 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"Walk me through your current database operational model — who owns infrastructure, manages upgrades, handles backups, and responds to incidents at 2 AM? One person or a team?"</div>
+            <div class="q-expand"><div class="q-expand-label">Listen for</div>Key person dependencies, bus factor risk, and whether operational responsibility is concentrated in a single "database person."</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">OS-CS-2 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"How many different database technologies are you running in production, and how many people have deep expertise in each one?"</div>
+            <div class="q-expand"><div class="q-expand-label">Listen for</div>Polyglot proliferation. Most teams run 3–5 database technologies and are one resignation away from a knowledge crisis.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">OS-CS-3 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"Tell me about your database upgrade process — how long does it take from decision to completion, and what is the downtime window?"</div>
+            <div class="q-expand"><div class="q-expand-label">Listen for</div>How much operational debt they're carrying by running old versions, and how disruptive upgrades are.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">OS-CS-4 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"How do you handle configuration drift across dev, staging, and production? Are you confident staging accurately reflects production behavior?"</div>
+            <div class="q-expand"><div class="q-expand-label">Listen for</div>Configuration drift is universal and under-acknowledged. Bugs that only appear in production are expensive.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">OS-CS-5 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"How do you manage database monitoring and alerting — when a slow query starts degrading production performance, how quickly do you know about it?"</div>
+            <div class="q-expand"><div class="q-expand-label">Listen for</div>Reactive vs. proactive operations. Most teams find out about issues when users complain, not when degradation begins.</div>
+          </div>
+        </div>
+      </div>
+      <div class="quad-cell quad-nc" data-label="Negative Consequences">
+        <div class="quad-glow"></div>
+        <div class="quad-header"><span class="quad-icon">🔴</span><div><div class="quad-title">Negative Consequences</div></div></div>
+        <p class="quad-tagline">Surface the operational toil, risk, and engineering cost</p>
+        <div class="q-list">
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">OS-NC-1 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"When you need to make a schema change in production — adding a field, changing a type, adding an index — what is your actual process, how long does it take, and is there a downtime window?"</div>
+            <div class="q-expand"><div class="q-expand-label">The trap</div>Schema changes in relational DBs are high-risk events. Engineers have normalized significant operational overhead.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">OS-NC-2 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"When your most experienced DBA takes a two-week vacation, what is the actual operational risk? Is there a backup who can truly handle a production incident independently?"</div>
+            <div class="q-expand"><div class="q-expand-label">The trap</div>Key person dependency is a business continuity risk. Most CTOs are uncomfortable when they think this through honestly.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">OS-NC-3 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"If I asked you right now to spin up an exact replica of production in a different region for a DR test — how long would that take and how many teams would need to be involved?"</div>
+            <div class="q-expand"><div class="q-expand-label">The trap</div>For most teams this is days or weeks and involves DBA, infrastructure, security, and networking. The contrast with Atlas is stark.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">OS-NC-4 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"When did you last audit who currently has production database access — and are you confident that list is accurate?"</div>
+            <div class="q-expand"><div class="q-expand-label">The trap</div>Credential hygiene is universally under-managed. If they can't immediately answer, you've surfaced a compliance and security risk.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">OS-NC-5 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"What percentage of your weekly engineering discussions involve a database operational issue — a slow query, disk pressure, backup failure, replication lag?"</div>
+            <div class="q-expand"><div class="q-expand-label">The trap</div>When the honest answer is "30–40%," the team recognizes it out loud, often for the first time. That is not engineering — that is database babysitting.</div>
+          </div>
+        </div>
+      </div>
+      <div class="quad-cell quad-fs" data-label="Future State">
+        <div class="quad-glow"></div>
+        <div class="quad-header"><span class="quad-icon">🟢</span><div><div class="quad-title">Future State</div></div></div>
+        <p class="quad-tagline">Paint the picture of zero-toil, self-managing infrastructure</p>
+        <div class="q-list">
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">OS-FS-1 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"If database upgrades, patches, and backups were fully automated and required zero engineering intervention — what would your operations team do with that reclaimed capacity?"</div>
+            <div class="q-expand"><div class="q-expand-label">Goal</div>Let them imagine redirecting operational labor toward strategic engineering work.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">OS-FS-2 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"Imagine every environment — dev, staging, production — was provisioned from the same configuration template and guaranteed to behave identically. How would that change your confidence in pre-production testing?"</div>
+            <div class="q-expand"><div class="q-expand-label">Goal</div>Make them feel the contrast with their current configuration drift reality.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">OS-FS-3 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"If your database tier proactively surfaced slow queries, recommended indexes, and alerted you before problems became incidents — what would that mean for your on-call burden?"</div>
+            <div class="q-expand"><div class="q-expand-label">Goal</div>Shift the conversation from reactive firefighting to proactive, intelligent operations.</div>
+          </div>
+        </div>
+      </div>
+      <div class="quad-cell quad-pc" data-label="Positive Consequences">
+        <div class="quad-glow"></div>
+        <div class="quad-header"><span class="quad-icon">🟡</span><div><div class="quad-title">Positive Consequences</div></div></div>
+        <p class="quad-tagline">Connect operational simplicity to team resilience and velocity</p>
+        <div class="q-list">
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">OS-PC-1 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"If you could reduce database operational overhead from 40% of engineering time to under 5% — what would your team ship in the next two quarters with that capacity?"</div>
+            <div class="q-expand"><div class="q-expand-label">Goal</div>Quantify the product output that operational freedom unlocks.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">OS-PC-2 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"If any engineer — not just your database specialist — could provision, monitor, and manage a production-ready cluster without specialized DBA knowledge, how would that change your team's resilience and hiring flexibility?"</div>
+            <div class="q-expand"><div class="q-expand-label">Goal</div>Connect democratized operations to organizational resilience and talent strategy.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DEVELOPER VELOCITY -->
+  <div class="pillar-panel" id="panel-dv">
+    <p class="pillar-title">Pillar 4 — Developer Velocity</p>
+    <div class="quadrant">
+      <div class="quad-cell quad-cs" data-label="Current State">
+        <div class="quad-glow"></div>
+        <div class="quad-header"><span class="quad-icon">🔵</span><div><div class="quad-title">Current State</div></div></div>
+        <p class="quad-tagline">Map every database-related friction point in the dev lifecycle</p>
+        <div class="q-list">
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">DV-CS-1 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"Walk me through a new feature from coding to production — specifically every database-related step. How many handoffs are there, and how many involve waiting for a DBA or infrastructure team?"</div>
+            <div class="q-expand"><div class="q-expand-label">Listen for</div>Every handoff to a DBA is a potential multi-day delay. The number of DB-related friction points is almost always higher than leadership realizes.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">DV-CS-2 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"How do your developers iterate on the data model as requirements change mid-sprint? What happens when they need to add a field or restructure a document partway through development?"</div>
+            <div class="q-expand"><div class="q-expand-label">Listen for</div>Schema migration friction. If adding a field requires a DBA ticket, migration script, and deployment window — that slows features by days.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">DV-CS-3 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"How long does it take a new backend engineer to be productive with your full database stack? What are the most common mistakes in the first 90 days?"</div>
+            <div class="q-expand"><div class="q-expand-label">Listen for</div>Cognitive overhead of the current stack. Learning three database technologies is a significant time-to-contribution delay per new hire.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">DV-CS-4 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"When your roadmap requires a new capability — full-text search, AI recommendations, vector search — what is the process for evaluating, provisioning, integrating, and maintaining that new service?"</div>
+            <div class="q-expand"><div class="q-expand-label">Listen for</div>Whether new capabilities drive new technologies, new operational burdens, and new integration complexity.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">DV-CS-5 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"How do your developers handle data that doesn't fit neatly into your relational schema — variable attributes, user-generated content, semi-structured event data? Are any being stored as JSON blobs in text columns?"</div>
+            <div class="q-expand"><div class="q-expand-label">Listen for</div>JSON in VARCHAR/TEXT is a visible sign of relational schema strain. The document model is already winning — they haven't connected the dots.</div>
+          </div>
+        </div>
+      </div>
+      <div class="quad-cell quad-nc" data-label="Negative Consequences">
+        <div class="quad-glow"></div>
+        <div class="quad-header"><span class="quad-icon">🔴</span><div><div class="quad-title">Negative Consequences</div></div></div>
+        <p class="quad-tagline">Surface the hidden tax on developer speed and product output</p>
+        <div class="q-list">
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">DV-NC-1 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"When a developer writes a query that performs fine in dev but causes a full table scan in production on 100x the data — how quickly do you detect that? Has it ever caused a user-facing incident?"</div>
+            <div class="q-expand"><div class="q-expand-label">The trap</div>This has happened at virtually every company that has scaled. The honest answer is almost always yes.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">DV-NC-2 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"How many developers can write complex, well-optimized queries independently — and how many are writing queries your DBA regularly has to rewrite? What is that review cycle doing to your release cadence?"</div>
+            <div class="q-expand"><div class="q-expand-label">The trap</div>The DBA query review bottleneck is a real and underacknowledged release velocity constraint.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">DV-NC-3 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"When your product team asks for faceted search, autocomplete, or semantic AI search — what is the full engineering scope required today? What is the realistic timeline from request to production?"</div>
+            <div class="q-expand"><div class="q-expand-label">The trap</div>If the answer involves Elasticsearch, a sync pipeline, two systems, and data consistency work — that's a multi-month project for a feature that should take days.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">DV-NC-4 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"How do your developers write integration tests for database-dependent code? If mocking the database layer — how confident are you those mocks accurately reflect production behavior?"</div>
+            <div class="q-expand"><div class="q-expand-label">The trap</div>Database mocks create false confidence. Bugs involving type coercion, index behavior, transaction semantics slip through and appear in production.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">DV-NC-5 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"Your competitors are shipping features faster. When you retrospect on the velocity gap, how much of it traces back to database-related friction — migrations, capacity work, search integration, infrastructure management?"</div>
+            <div class="q-expand"><div class="q-expand-label">The trap</div>This connects database architecture to competitive positioning. Most engineering leaders have felt this but never quantified it.</div>
+          </div>
+        </div>
+      </div>
+      <div class="quad-cell quad-fs" data-label="Future State">
+        <div class="quad-glow"></div>
+        <div class="quad-header"><span class="quad-icon">🟢</span><div><div class="quad-title">Future State</div></div></div>
+        <p class="quad-tagline">Paint the picture of frictionless, fast, AI-ready development</p>
+        <div class="q-list">
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">DV-FS-1 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"If a developer could add a new field to the data model without a migration script, DBA review, or deployment window — just write the new field in application code and have it work — how would that change sprint velocity?"</div>
+            <div class="q-expand"><div class="q-expand-label">Goal</div>Make them feel the contrast between schema-less flexibility and current migration friction.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">DV-FS-2 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"Imagine your search index, vector embeddings, and operational data all lived in the same platform with no sync pipeline. How would that simplify your architecture and accelerate your AI feature roadmap?"</div>
+            <div class="q-expand"><div class="q-expand-label">Goal</div>Connect unified data platform to AI feature acceleration.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">DV-FS-3 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"If every engineer on your team could query, optimize, and manage the database using a single consistent API they already know — what would that do to onboarding time and team resilience?"</div>
+            <div class="q-expand"><div class="q-expand-label">Goal</div>Connect a unified developer experience to team productivity and hiring outcomes.</div>
+          </div>
+        </div>
+      </div>
+      <div class="quad-cell quad-pc" data-label="Positive Consequences">
+        <div class="quad-glow"></div>
+        <div class="quad-header"><span class="quad-icon">🟡</span><div><div class="quad-title">Positive Consequences</div></div></div>
+        <p class="quad-tagline">Connect developer freedom to competitive advantage</p>
+        <div class="q-list">
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">DV-PC-1 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"If you removed every database-related handoff from your development lifecycle — DBA reviews, migration approvals, search sync maintenance — how many additional features per quarter do you think your team would ship?"</div>
+            <div class="q-expand"><div class="q-expand-label">Goal</div>Quantify the product throughput increase from removing database friction.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">DV-PC-2 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"If adding AI-powered search took days instead of months — because the vector store, search engine, and operational database were one platform — how would that change your competitive positioning in the next product cycle?"</div>
+            <div class="q-expand"><div class="q-expand-label">Goal</div>Connect platform consolidation to AI feature speed and market competitiveness.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STRATEGIC -->
+  <div class="pillar-panel" id="panel-st">
+    <p class="pillar-title">Strategic Cross-Cutting — Across All Four Pillars</p>
+    <div class="quadrant">
+      <div class="quad-cell quad-cs" data-label="Current State">
+        <div class="quad-glow"></div>
+        <div class="quad-header"><span class="quad-icon">🔵</span><div><div class="quad-title">Current State</div></div></div>
+        <p class="quad-tagline">Establish the holistic view across all dimensions</p>
+        <div class="q-list">
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">ST-CS-1 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"If you had to score your current database platform one to ten across high availability, scalability, operational simplicity, and developer velocity — what would those four scores be?"</div>
+            <div class="q-expand"><div class="q-expand-label">Listen for</div>Self-assessed gaps become your discussion anchors. You didn't identify the problems — they did.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">ST-CS-2 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"How many separate database technologies are you operating in production today across all four dimensions — HA, scalability, operations, and developer experience?"</div>
+            <div class="q-expand"><div class="q-expand-label">Listen for</div>Total polyglot footprint. Every additional system multiplies operational complexity non-linearly.</div>
+          </div>
+        </div>
+      </div>
+      <div class="quad-cell quad-nc" data-label="Negative Consequences">
+        <div class="quad-glow"></div>
+        <div class="quad-header"><span class="quad-icon">🔴</span><div><div class="quad-title">Negative Consequences</div></div></div>
+        <p class="quad-tagline">Connect technical gaps to existential business risk</p>
+        <div class="q-list">
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">ST-NC-1 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"Across HA, scalability, operations, developer velocity — which represents the biggest threat to your business goals over the next 18 months, and what happens if that risk materializes?"</div>
+            <div class="q-expand"><div class="q-expand-label">Why this question</div>Forces prioritization and connects technical gaps to business risk. Whatever they name becomes your lead value proposition.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">ST-NC-2 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"Three years from now — 50x data volume, five regions, AI on every product surface, half the headcount you wanted — is your current database architecture designed to get you there, or will you be rebuilding under pressure during a growth moment?"</div>
+            <div class="q-expand"><div class="q-expand-label">The trap</div>Rebuilding under pressure during growth is one of the most expensive and risky engineering scenarios. If they can't say yes confidently, you have the conversation.</div>
+          </div>
+        </div>
+      </div>
+      <div class="quad-cell quad-fs" data-label="Future State">
+        <div class="quad-glow"></div>
+        <div class="quad-header"><span class="quad-icon">🟢</span><div><div class="quad-title">Future State</div></div></div>
+        <p class="quad-tagline">Make them articulate the ideal unified platform</p>
+        <div class="q-list">
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">ST-FS-1 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"Describe what your ideal database platform looks like in a world where HA, scalability, operations, and developer experience are all solved — what does your team spend their time on instead?"</div>
+            <div class="q-expand"><div class="q-expand-label">Goal</div>Let them paint the vision of a fully-solved platform so they own the picture of the ideal state.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">ST-FS-2 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"If you could consolidate your current polyglot database stack into a single unified platform without sacrificing any capability — what would that enable your engineering organization to do that you cannot do today?"</div>
+            <div class="q-expand"><div class="q-expand-label">Goal</div>Make consolidation feel like a capability unlock rather than a constraint.</div>
+          </div>
+        </div>
+      </div>
+      <div class="quad-cell quad-pc" data-label="Positive Consequences">
+        <div class="quad-glow"></div>
+        <div class="quad-header"><span class="quad-icon">🟡</span><div><div class="quad-title">Positive Consequences</div></div></div>
+        <p class="quad-tagline">Make them say the total value out loud</p>
+        <div class="q-list">
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">ST-PC-1 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"If I could show you that eliminating your search sync pipeline, vector database, and manual HA management could simultaneously reduce costs, improve consistency, and accelerate feature delivery — what would need to be true for you to seriously evaluate that path?"</div>
+            <div class="q-expand"><div class="q-expand-label">Goal</div>Lower the evaluation barrier by addressing multiple business outcomes simultaneously.</div>
+          </div>
+          <div class="q-card" onclick="toggle(this)">
+            <div class="q-id">ST-PC-2 <span class="q-toggle">▼</span></div>
+            <div class="q-text">"Imagine your team 12 months from now — no database incidents at 2 AM, no scaling projects, no sync pipelines, developers shipping at full velocity. What does that version of your engineering organization look like, and what is that worth to the business?"</div>
+            <div class="q-expand"><div class="q-expand-label">Goal</div>The ultimate closing question. Make them articulate the full ROI story in their own words.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Flow Bar -->
+  <div class="flow-bar">
+    <div class="flow-step flow-cs">
+      <div class="step-dot"></div>
+      <div class="step-name">Current State</div>
+      <div class="step-desc">Let them describe<br>their world</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step flow-nc">
+      <div class="step-dot"></div>
+      <div class="step-name">Neg. Consequences</div>
+      <div class="step-desc">Help them feel<br>the cost of inaction</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step flow-fs">
+      <div class="step-dot"></div>
+      <div class="step-name">Future State</div>
+      <div class="step-desc">Let them articulate<br>what better looks like</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step flow-pc">
+      <div class="step-dot"></div>
+      <div class="step-name">Pos. Consequences</div>
+      <div class="step-desc">Make them say<br>the value out loud</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // Tab switching
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      const pillar = tab.dataset.pillar;
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.pillar-panel').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('panel-' + pillar).classList.add('active');
+    });
+  });
+
+  // Card expand/collapse
+  function toggle(card) {
+    const wasOpen = card.classList.contains('open');
+    // Close all in same quadrant
+    card.closest('.q-list').querySelectorAll('.q-card').forEach(c => c.classList.remove('open'));
+    if (!wasOpen) card.classList.add('open');
+  }
+</script>
+</body>
+</html>
